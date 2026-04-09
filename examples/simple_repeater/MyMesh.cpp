@@ -1325,8 +1325,12 @@ void MyMesh::loop() {
 
   // is pending dirty contacts write needed?
   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
-    acl.save(_fs);
-    dirty_contacts_expiry = 0;
+    if (_mgr->getOutboundTotal() == 0) {
+      acl.save(_fs);
+      dirty_contacts_expiry = 0;
+    } else {
+      dirty_contacts_expiry = futureMillis(1000); // retry when radio is idle
+    }
   }
 
   // update uptime

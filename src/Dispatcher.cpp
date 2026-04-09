@@ -80,6 +80,12 @@ void Dispatcher::loop() {
   }
   if (!is_recv && _ms->getMillis() - radio_nonrx_start > 8000) {   // radio has not been in Rx mode for 8 seconds!
     _err_flags |= ERR_EVENT_STARTRX_TIMEOUT;
+    if (outbound) {
+      releasePacket(outbound);
+      outbound = NULL;
+    }
+    _radio->onSendFinished();
+    radio_nonrx_start = _ms->getMillis();  // reset to avoid repeated recovery
   }
 
   if (outbound) {  // waiting for outbound send to be completed
