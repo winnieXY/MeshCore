@@ -8,6 +8,25 @@
   static UITask ui_task(display);
 #endif
 
+// --- Software watchdog (nRF52 only) ---
+// Uses a FreeRTOS SoftwareTimer to detect main loop hangs.
+// The timer fires every 15 seconds; if loop() hasn't run since the last
+// check, we assume the system is stuck and reset. This catches Softdevice
+// lockups and other hard hangs that block the main loop.
+#if defined(NRF52_PLATFORM)
+#include <nrf_nvic.h>
+static SoftwareTimer watchdog_timer;
+static volatile bool loop_alive = false;
+
+static void watchdog_callback(TimerHandle_t _handle) {
+  (void)_handle;
+  if (!loop_alive) {
+    NVIC_SystemReset();  // main loop is stuck — reset
+  }
+  loop_alive = false;    // arm for next check
+}
+#endif
+
 StdRNG fast_rng;
 SimpleMeshTables tables;
 
@@ -103,9 +122,18 @@ void setup() {
 #if ENABLE_ADVERT_ON_BOOT == 1
   the_mesh.sendSelfAdvertisement(16000, false);
 #endif
+
+#if defined(NRF52_PLATFORM)
+  // Start software watchdog — resets device if loop() stops running for 15s
+  watchdog_timer.begin(15000, watchdog_callback);
+  watchdog_timer.start();
+#endif
 }
 
 void loop() {
+#if defined(NRF52_PLATFORM)
+  loop_alive = true;  // feed software watchdog
+#endif
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
     char c = Serial.read();
