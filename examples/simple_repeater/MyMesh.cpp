@@ -1325,11 +1325,14 @@ void MyMesh::loop() {
 
   // is pending dirty contacts write needed?
   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
-    if (_mgr->getOutboundTotal() == 0) {
+    if (_mgr->getOutboundTotal() > 0) {
+      dirty_contacts_expiry = futureMillis(200);  // retry shortly after outbound drains
+    } else {
+      // Suspend radio before flash I/O to prevent Softdevice flash/radio conflicts
+      // that can cause the device to hang. Radio restarts automatically on next loop.
+      _radio->suspendRadio();
       acl.save(_fs);
       dirty_contacts_expiry = 0;
-    } else {
-      dirty_contacts_expiry = futureMillis(1000); // retry when radio is idle
     }
   }
 

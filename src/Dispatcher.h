@@ -70,6 +70,12 @@ public:
   virtual bool isInRecvMode() const = 0;
 
   /**
+   * \brief  put radio into standby. Next recvRaw() call will restart receive.
+   *         Used to prevent radio interrupts from interfering with flash I/O.
+  */
+  virtual void suspendRadio() { }
+
+  /**
    * \returns  true if the radio is currently mid-receive of a packet.
   */
   virtual bool isReceiving() { return false; }
