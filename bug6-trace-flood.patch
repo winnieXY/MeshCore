@@ -1,0 +1,44 @@
+--- a/src/Mesh.h
++++ b/src/Mesh.h
+@@ -27,6 +27,11 @@
+ class Mesh : public Dispatcher {
+   RTCClock* _rtc;
+   RNG* _rng;
+   MeshTables* _tables;
+ 
++  // TRACE forwarding rate limiter (Bug #6 fix)
++  static const int TRACE_RATE_LIMIT = 4;           // max forwards per window
++  static const unsigned long TRACE_RATE_WINDOW_MS = 10000;  // 10-second window
++  int _trace_fwd_count = 0;
++  unsigned long _trace_window_start = 0;
++
+   void removeSelfFromPath(Packet* packet);
+   void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
+--- a/src/Mesh.cpp
++++ b/src/Mesh.cpp
+@@ -42,6 +42,18 @@
+   if (pkt->isRouteDirect() && pkt->getPayloadType() == PAYLOAD_TYPE_TRACE) {
+     if (pkt->path_len < MAX_PATH_SIZE) {
++      // Rate-limit TRACE forwarding to prevent flood DoS (Bug #6)
++      unsigned long now = _ms->getMillis();
++      if (now - _trace_window_start > TRACE_RATE_WINDOW_MS) {
++        // Start a new rate-limit window
++        _trace_window_start = now;
++        _trace_fwd_count = 0;
++      }
++      if (_trace_fwd_count >= TRACE_RATE_LIMIT) {
++        // Rate limit exceeded — drop this TRACE silently
++        return ACTION_RELEASE;
++      }
++
+       uint8_t i = 0;
+       uint32_t trace_tag;
+       memcpy(&trace_tag, &pkt->payload[i], 4); i += 4;
+@@ -56,6 +68,7 @@
+       } else if (self_id.isHashMatch(&pkt->payload[i + offset], 1 << path_sz) && allowPacketForward(pkt) && !_tables->hasSeen(pkt)) {
+         // append SNR (Not hash!)
+         pkt->path[pkt->path_len++] = (int8_t) (pkt->getSNR()*4);
++        _trace_fwd_count++;   // count this forward against rate limit
+ 
+         uint32_t d = getDirectRetransmitDelay(pkt);
+         return ACTION_RETRANSMIT_DELAYED(5, d);  // schedule with priority 5 (for now), maybe make configurable?

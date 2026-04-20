@@ -1,0 +1,24 @@
+--- a/src/Mesh.cpp
++++ b/src/Mesh.cpp
+@@ -42,14 +42,16 @@
+   if (pkt->isRouteDirect() && pkt->getPayloadType() == PAYLOAD_TYPE_TRACE) {
+     if (pkt->path_len < MAX_PATH_SIZE) {
+       uint8_t i = 0;
+       uint32_t trace_tag;
+       memcpy(&trace_tag, &pkt->payload[i], 4); i += 4;
+       uint32_t auth_code;
+       memcpy(&auth_code, &pkt->payload[i], 4); i += 4;
+       uint8_t flags = pkt->payload[i++];
+       uint8_t path_sz = flags & 0x03;  // NEW v1.11+: lower 2 bits is path hash size
+ 
+       uint8_t len = pkt->payload_len - i;
+-      uint8_t offset = pkt->path_len << path_sz;
++      uint16_t offset = (uint16_t)pkt->path_len << path_sz;  // use uint16_t to prevent truncation overflow
++      if (offset > len) offset = len;  // clamp: treat as "reached end of path" if offset exceeds payload
+       if (offset >= len) {   // TRACE has reached end of given path
+         onTraceRecv(pkt, trace_tag, auth_code, flags, pkt->path, &pkt->payload[i], len);
+-      } else if (self_id.isHashMatch(&pkt->payload[i + offset], 1 << path_sz) && allowPacketForward(pkt) && !_tables->hasSeen(pkt)) {
++      } else if (i + offset + (1 << path_sz) <= pkt->payload_len
++                 && self_id.isHashMatch(&pkt->payload[i + offset], 1 << path_sz) && allowPacketForward(pkt) && !_tables->hasSeen(pkt)) {
+         // append SNR (Not hash!)
+         pkt->path[pkt->path_len++] = (int8_t) (pkt->getSNR()*4);

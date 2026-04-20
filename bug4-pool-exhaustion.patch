@@ -1,0 +1,43 @@
+--- a/src/Dispatcher.cpp
++++ b/src/Dispatcher.cpp
+@@ -192,12 +192,30 @@ void Dispatcher::checkRecv() {
+   float score;
+   uint32_t air_time;
+   {
+     uint8_t raw[MAX_TRANS_UNIT+1];
+     int len = _radio->recvRaw(raw, MAX_TRANS_UNIT);
+     if (len > 0) {
+       logRxRaw(_radio->getLastSNR(), _radio->getLastRSSI(), raw, len);
+ 
+       pkt = _mgr->allocNew();
+       if (pkt == NULL) {
++        // Pool exhausted — evict the last queued outbound packet so
++        // inbound traffic is not silently dropped.
++        int total = _mgr->getOutboundTotal();
++        if (total > 0) {
++          Packet* evicted = _mgr->removeOutboundByIdx(total - 1);
++          if (evicted) {
++            MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): evicted queued TX to make room for RX", getLogDateTime());
++            _mgr->free(evicted);
++            pkt = _mgr->allocNew();
++          }
++        }
++        if (pkt == NULL) {
++          MESH_DEBUG_PRINTLN("%s Dispatcher::checkRecv(): WARNING: received data, no unused packets available!", getLogDateTime());
++        }
+       } else {
+         if (tryParsePacket(pkt, raw, len)) {
+           pkt->_snr = _radio->getLastSNR() * 4.0f;
+@@ -368,7 +386,13 @@ void Dispatcher::sendPacket(Packet* packet, uint8_t priority, uint32_t delay_mil
+   if (!Packet::isValidPathLen(packet->path_len) || packet->payload_len > MAX_PACKET_PAYLOAD) {
+     MESH_DEBUG_PRINTLN("%s Dispatcher::sendPacket(): ERROR: invalid packet... path_len=%d, payload_len=%d", getLogDateTime(), (uint32_t) packet->path_len, (uint32_t) packet->payload_len);
+     _mgr->free(packet);
++  } else if (_mgr->getFreeCount() < 1) {
++    // Refuse to queue if it would leave zero free slots — always reserve
++    // at least 1 slot so checkRecv() can allocate for inbound traffic.
++    MESH_DEBUG_PRINTLN("%s Dispatcher::sendPacket(): WARNING: dropping outbound, pool reserve exhausted", getLogDateTime());
++    _mgr->free(packet);
+   } else {
+     _mgr->queueOutbound(packet, priority, futureMillis(delay_millis));
+   }
+ }

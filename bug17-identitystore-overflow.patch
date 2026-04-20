@@ -1,0 +1,52 @@
+--- Bug #17 -- Patch: Fix IdentityStore sprintf Buffer Overflow
+---
+--- Root cause:
+---   All four methods in IdentityStore.cpp use sprintf into a 40-byte stack
+---   buffer: sprintf(filename, "%s/%s.id", _dir, name).  While current
+---   callers are safe (both _dir and name are hardcoded short strings), the
+---   pattern is unsafe and will overflow if a future caller passes a longer
+---   name parameter.
+---
+--- Fix:
+---   Replace sprintf with snprintf + sizeof(filename) in all four methods.
+---   This truncates the filename if it would exceed the buffer, preventing
+---   stack corruption.  A truncated filename will simply fail to open/create
+---   the file (harmless).
+---
+--- Files changed:
+---   src/helpers/IdentityStore.cpp -- 4 x sprintf -> snprintf
+
+--- a/src/helpers/IdentityStore.cpp
++++ b/src/helpers/IdentityStore.cpp
+@@ -3,7 +3,7 @@
+ bool IdentityStore::load(const char *name, mesh::LocalIdentity& id) {
+   bool loaded = false;
+   char filename[40];
+-  sprintf(filename, "%s/%s.id", _dir, name);
++  snprintf(filename, sizeof(filename), "%s/%s.id", _dir, name);
+   if (_fs->exists(filename)) {
+ #if defined(RP2040_PLATFORM)
+     File file = _fs->open(filename, "r");
+@@ -21,7 +21,7 @@
+ bool IdentityStore::load(const char *name, mesh::LocalIdentity& id, char display_name[], int max_name_sz) {
+   bool loaded = false;
+   char filename[40];
+-  sprintf(filename, "%s/%s.id", _dir, name);
++  snprintf(filename, sizeof(filename), "%s/%s.id", _dir, name);
+   if (_fs->exists(filename)) {
+ #if defined(RP2040_PLATFORM)
+     File file = _fs->open(filename, "r");
+@@ -45,7 +45,7 @@
+ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id) {
+   char filename[40];
+-  sprintf(filename, "%s/%s.id", _dir, name);
++  snprintf(filename, sizeof(filename), "%s/%s.id", _dir, name);
+ 
+ #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+@@ -67,7 +67,7 @@
+ bool IdentityStore::save(const char *name, const mesh::LocalIdentity& id, const char display_name[]) {
+   char filename[40];
+-  sprintf(filename, "%s/%s.id", _dir, name);
++  snprintf(filename, sizeof(filename), "%s/%s.id", _dir, name);
+ 
+ #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)

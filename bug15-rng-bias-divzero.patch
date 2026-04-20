@@ -1,0 +1,53 @@
+--- Bug #15 — Patch: Fix RNG::nextInt Division-by-Zero and Modular Bias
+---
+--- Root cause:
+---   RNG::nextInt(uint32_t _min, uint32_t _max) computes `num % (_max - _min)`.
+---   If _max == _min, this is unsigned integer division by zero — undefined
+---   behavior in C++. On ARM this may return garbage, trap to HardFault, or
+---   behave unpredictably.
+---
+---   The modulo operation also introduces modular bias when the range does
+---   not evenly divide 2^32. For current callers the bias is negligible
+---   (< 0.005% for the largest range), but the fix is simple and correct.
+---
+--- Fix:
+---   1. Guard _max <= _min: return _min immediately (no UB).
+---   2. Apply rejection sampling: discard values in the biased prefix of
+---      the uint32_t range before taking modulo. This eliminates bias for
+---      all range sizes with expected ~1 iteration overhead.
+---
+--- Also fix the BLE PIN caller to use range [100000, 1000000) so that
+--- PIN 999999 is not excluded.
+---
+--- Files changed:
+---   src/Utils.cpp                       — nextInt: guard + rejection sampling
+---   examples/companion_radio/MyMesh.cpp — BLE PIN: 999999 → 1000000
+
+--- a/src/Utils.cpp
++++ b/src/Utils.cpp
+@@ -11,6 +11,13 @@
+ uint32_t RNG::nextInt(uint32_t _min, uint32_t _max) {
++  if (_max <= _min) return _min;  // guard: prevents division-by-zero UB
++
++  uint32_t range = _max - _min;
+   uint32_t num;
+-  random((uint8_t *) &num, sizeof(num));
+-  return (num % (_max - _min)) + _min;
++  uint32_t threshold = (0U - range) % range;  // = 2^32 mod range
++  do {
++    random((uint8_t *) &num, sizeof(num));
++  } while (num < threshold);  // reject biased prefix; expected ~1 iteration
++
++  return (num % range) + _min;
+ }
+
+--- a/examples/companion_radio/MyMesh.cpp
++++ b/examples/companion_radio/MyMesh.cpp
+@@ -933,7 +933,7 @@
+     if (has_display && BLE_PIN_CODE == 123456) {
+       StdRNG rng;
+-      _active_ble_pin = rng.nextInt(100000, 999999); // random pin each session
++      _active_ble_pin = rng.nextInt(100000, 1000000); // random 6-digit pin each session [100000, 999999]
+     } else {
+       _active_ble_pin = BLE_PIN_CODE; // otherwise static pin
+     }

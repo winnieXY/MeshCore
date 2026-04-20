@@ -1,0 +1,48 @@
+Bug #9 fix — Add recovery action when radio-stuck is detected
+==============================================================
+When the radio has been outside RX mode for >8 seconds, the existing
+code only sets ERR_EVENT_STARTRX_TIMEOUT.  This patch adds actual
+recovery:
+  1. If an outbound packet is stuck mid-TX, force-release it
+  2. Call onSendFinished() to clean up the radio state (finishTransmit)
+  3. The next checkRecv() → recvRaw() → startReceive() restarts RX
+
+This covers:
+  • Stuck TX (DIO1 interrupt lost, SPI glitch)
+  • startReceive() failure leaving radio in STATE_IDLE
+  • Any state where the radio is not in RX for >8s
+
+--- a/src/Dispatcher.cpp
++++ b/src/Dispatcher.cpp
+@@ -73,12 +73,25 @@ void Dispatcher::loop() {
+   _radio->loop();
+ 
+   // check for radio 'stuck' in mode other than Rx
+   bool is_recv = _radio->isInRecvMode();
+   if (is_recv != prev_isrecv_mode) {
+     prev_isrecv_mode = is_recv;
+     if (!is_recv) {
+       radio_nonrx_start = _ms->getMillis();
+     }
+   }
+   if (!is_recv && _ms->getMillis() - radio_nonrx_start > 8000) {   // radio has not been in Rx mode for 8 seconds!
+     _err_flags |= ERR_EVENT_STARTRX_TIMEOUT;
++
++    // Attempt recovery: if a TX is stuck, force-release it so the
++    // radio can go back into RX mode via checkRecv() → recvRaw().
++    if (outbound) {
++      MESH_DEBUG_PRINTLN("%s Dispatcher::loop(): radio stuck — force-releasing stuck outbound TX", getLogDateTime());
++      _radio->onSendFinished();
++      logTxFail(outbound, 2 + outbound->getPathByteLen() + outbound->payload_len);
++      releasePacket(outbound);
++      outbound = NULL;
++    } else {
++      // No outbound but radio still not in RX — force a sleep/idle cycle
++      // to reset the SX1262 state machine, then let recvRaw() restart RX.
++      MESH_DEBUG_PRINTLN("%s Dispatcher::loop(): radio stuck — forcing radio reset", getLogDateTime());
++      _radio->resetAGC();
++    }
++    radio_nonrx_start = _ms->getMillis();  // avoid firing every loop iteration
+   }
+ 
+   if (outbound) {  // waiting for outbound send to be completed

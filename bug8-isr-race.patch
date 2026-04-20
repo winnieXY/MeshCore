@@ -1,0 +1,163 @@
+--- a/src/helpers/radiolib/RadioLibWrappers.cpp
++++ b/src/helpers/radiolib/RadioLibWrappers.cpp
+@@ -26,8 +26,9 @@
+ 
+ void RadioLibWrapper::begin() {
+   _radio->setPacketReceivedAction(setFlag);  // this is also SentComplete interrupt
++  noInterrupts();
+   state = STATE_IDLE;
+-
++  interrupts();
+   if (_board->getStartupReason() == BD_STARTUP_RX_PACKET) {  // received a LoRa packet (while in deep sleep)
+     setFlag(); // LoRa packet is already received
+   }
+@@ -42,7 +43,9 @@
+ 
+ void RadioLibWrapper::idle() {
+   _radio->standby();
++  noInterrupts();
+   state = STATE_IDLE;   // need another startReceive()
++  interrupts();
+ }
+ 
+ void RadioLibWrapper::triggerNoiseFloorCalibrate(int threshold) {
+@@ -59,10 +62,14 @@
+ 
+ void RadioLibWrapper::resetAGC() {
+   // make sure we're not mid-receive of packet!
+-  if ((state & STATE_INT_READY) != 0 || isReceivingPacket()) return;
++  noInterrupts();
++  uint8_t s = state;
++  interrupts();
++  if ((s & STATE_INT_READY) != 0 || isReceivingPacket()) return;
+ 
+   doResetAGC();
++  noInterrupts();
+   state = STATE_IDLE;   // trigger a startReceive()
++  interrupts();
+ 
+   // Reset noise floor sampling so it reconverges from scratch.
+   // Without this, a stuck _noise_floor of -120 makes the sampling threshold
+@@ -74,7 +81,9 @@
+ }
+ 
+ void RadioLibWrapper::loop() {
+-  if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
++  noInterrupts();
++  uint8_t s = state;
++  interrupts();
++  if (s == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
+     if (!isReceivingPacket()) {
+       int rssi = getCurrentRSSI();
+       if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
+@@ -95,28 +104,40 @@
+ void RadioLibWrapper::startRecv() {
+   int err = _radio->startReceive();
+   if (err == RADIOLIB_ERR_NONE) {
+-    state = STATE_RX;
++    noInterrupts();
++    if (!(state & STATE_INT_READY)) {
++      state = STATE_RX;
++    }
++    interrupts();
+   } else {
+     MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
+   }
+ }
+ 
+ bool RadioLibWrapper::isInRecvMode() const {
+-  return (state & ~STATE_INT_READY) == STATE_RX;
++  noInterrupts();
++  uint8_t s = state;
++  interrupts();
++  return (s & ~STATE_INT_READY) == STATE_RX;
+ }
+ 
+ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
+   int len = 0;
+-  if (state & STATE_INT_READY) {
++  noInterrupts();
++  uint8_t s = state;
++  if (s & STATE_INT_READY) {
++    state = s & ~STATE_INT_READY;   // clear INT_READY atomically, keep base state
++  }
++  interrupts();
++
++  if (s & STATE_INT_READY) {
+     len = _radio->getPacketLength();
+     if (len > 0) {
+       if (len > sz) { len = sz; }
+       int err = _radio->readData(bytes, len);
+       if (err != RADIOLIB_ERR_NONE) {
+         MESH_DEBUG_PRINTLN("RadioLibWrapper: error: readData(%d)", err);
+         len = 0;
+         n_recv_errors++;
+       } else {
+-      //  Serial.print("  readData() -> "); Serial.println(len);
+         n_recv++;
+       }
+     }
+-    state = STATE_IDLE;   // need another startReceive()
++    noInterrupts();
++    state = STATE_IDLE;     // need another startReceive()
++    interrupts();
+   }
+ 
+-  if (state != STATE_RX) {
++  noInterrupts();
++  s = state;
++  interrupts();
++
++  if (s != STATE_RX) {
+     int err = _radio->startReceive();
+     if (err == RADIOLIB_ERR_NONE) {
+-      state = STATE_RX;
++      noInterrupts();
++      if (!(state & STATE_INT_READY)) {
++        state = STATE_RX;
++      }
++      // else: ISR fired during startReceive() — leave INT_READY so next poll picks it up
++      interrupts();
+     } else {
+       MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
+     }
+@@ -133,7 +154,9 @@
+ bool RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
+   _board->onBeforeTransmit();
+   int err = _radio->startTransmit((uint8_t *) bytes, len);
+   if (err == RADIOLIB_ERR_NONE) {
+-    state = STATE_TX_WAIT;
++    noInterrupts();
++    state = STATE_TX_WAIT;
++    interrupts();
+     return true;
+   }
+   MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startTransmit(%d)", err);
+@@ -143,16 +166,22 @@
+ }
+ 
+ bool RadioLibWrapper::isSendComplete() {
+-  if (state & STATE_INT_READY) {
+-    state = STATE_IDLE;
+-    n_sent++;
+-    return true;
++  noInterrupts();
++  bool done = (state & STATE_INT_READY) != 0;
++  if (done) {
++    state = STATE_IDLE;
+   }
+-  return false;
++  interrupts();
++  if (done) {
++    n_sent++;
++  }
++  return done;
+ }
+ 
+ void RadioLibWrapper::onSendFinished() {
+   _radio->finishTransmit();
+   _board->onAfterTransmit();
++  noInterrupts();
+   state = STATE_IDLE;
++  interrupts();
+ }

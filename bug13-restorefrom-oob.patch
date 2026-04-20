@@ -1,0 +1,19 @@
+--- a/src/helpers/SimpleMeshTables.h
++++ b/src/helpers/SimpleMeshTables.h
+@@ -29,10 +29,16 @@
+ #ifdef ESP32
+   void restoreFrom(File f) {
+     f.read(_hashes, sizeof(_hashes));
+     f.read((uint8_t *) &_next_idx, sizeof(_next_idx));
++    if (_next_idx < 0 || _next_idx >= MAX_PACKET_HASHES) {
++      _next_idx = 0;  // clamp corrupt value to valid range
++    }
+     f.read((uint8_t *) &_acks[0], sizeof(_acks));
+     f.read((uint8_t *) &_next_ack_idx, sizeof(_next_ack_idx));
++    if (_next_ack_idx < 0 || _next_ack_idx >= MAX_PACKET_ACKS) {
++      _next_ack_idx = 0;  // clamp corrupt value to valid range
++    }
+   }
+   void saveTo(File f) {
+     f.write(_hashes, sizeof(_hashes));
+     f.write((const uint8_t *) &_next_idx, sizeof(_next_idx));

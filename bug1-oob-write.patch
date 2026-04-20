@@ -1,0 +1,49 @@
+--- a/src/helpers/BaseChatMesh.cpp
++++ b/src/helpers/BaseChatMesh.cpp
+@@ -213,8 +213,11 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sende
+     uint32_t timestamp;
+     memcpy(&timestamp, data, 4);  // timestamp (by sender's RTC clock - which could be wrong)
+     uint8_t flags = data[4] >> 2;   // message attempt number, and other flags
+ 
+-    // len can be > original length, but 'text' will be padded with zeroes
+-    data[len] = 0; // need to make a C string again, with null terminator
++    // Null-terminate the text – clamp to buffer boundary to prevent OOB write.
++    // decrypt() can return more than MAX_PACKET_PAYLOAD when ciphertext is
++    // not a multiple of CIPHER_BLOCK_SIZE (e.g. injected radio packets).
++    if (len < MAX_PACKET_PAYLOAD) data[len] = 0;
++    else data[MAX_PACKET_PAYLOAD - 1] = 0;
+ 
+     if (flags == TXT_TYPE_PLAIN) {
+       from.lastmod = getRTCClock()->getCurrentTime(); // update last heard time
+@@ -371,8 +374,11 @@ void BaseChatMesh::onGroupDataRecv(mesh::Packet* packet, uint8_t type, const me
+     uint32_t timestamp;
+     memcpy(&timestamp, data, 4);
+ 
+-    // len can be > original length, but 'text' will be padded with zeroes
+-    data[len] = 0; // need to make a C string again, with null terminator
++    // Null-terminate the text – clamp to buffer boundary to prevent OOB write.
++    // decrypt() can return more than MAX_PACKET_PAYLOAD when ciphertext is
++    // not a multiple of CIPHER_BLOCK_SIZE (e.g. injected radio packets).
++    if (len < MAX_PACKET_PAYLOAD) data[len] = 0;
++    else data[MAX_PACKET_PAYLOAD - 1] = 0;
+ 
+     // notify UI  of this new message
+     onChannelMessageRecv(channel, packet, timestamp, (const char *) &data[5]);  // let UI know
+--- a/src/Utils.cpp
++++ b/src/Utils.cpp
+@@ -30,11 +30,14 @@ int Utils::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t*
+   AES128 aes;
+   uint8_t* dp = dest;
+   const uint8_t* sp = src;
++  int max_bytes = (src_len / CIPHER_BLOCK_SIZE) * CIPHER_BLOCK_SIZE;  // ignore trailing partial block
+ 
+   aes.setKey(shared_secret, CIPHER_KEY_SIZE);
+-  while (sp - src < src_len) {
++  while (sp - src < max_bytes) {
+     aes.decryptBlock(dp, sp);
+     dp += 16; sp += 16;
+   }
+ 
+-  return sp - src;  // will always be multiple of 16
++  return max_bytes;  // always a multiple of 16, never larger than src_len
+ }
