@@ -726,7 +726,7 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
       strcpy(reply, "Error: unsupported by this board");
     };
   } else {
-    sprintf(reply, "unknown config: %s", config);
+    snprintf(reply, CLI_REPLY_MAX, "unknown config: %.128s", config);
   }
 }
 
@@ -784,10 +784,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
   } else if (memcmp(config, "direct.txdelay", 14) == 0) {
     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
   } else if (memcmp(config, "owner.info", 10) == 0) {
-    *reply++ = '>';
-    *reply++ = ' ';
+    char* reply_end = reply + CLI_REPLY_MAX - 1;  // leave room for null
+    *reply++ = '>'; *reply++ = ' ';
     const char* sp = _prefs->owner_info;
-    while (*sp) {
+    while (*sp && reply < reply_end) {
       *reply++ = (*sp == '\n') ? '|' : *sp;    // translate newline back to orig '|'
       sp++;
     }
@@ -887,7 +887,7 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
     strcpy(reply, "ERROR: Power management not supported");
 #endif
   } else {
-    sprintf(reply, "??: %s", config);
+    snprintf(reply, CLI_REPLY_MAX, "??: %.128s", config);
   }
 }
 

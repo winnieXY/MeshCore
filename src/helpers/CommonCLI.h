@@ -10,6 +10,10 @@
 #define WITH_BRIDGE
 #endif
 
+// Smallest reply buffer among all callers (serial main.cpp: char reply[160]).
+// Used by snprintf() in CLI handlers to prevent stack buffer overflows.
+#define CLI_REPLY_MAX  160
+
 #define ADVERT_LOC_NONE       0
 #define ADVERT_LOC_SHARE      1
 #define ADVERT_LOC_PREFS      2
