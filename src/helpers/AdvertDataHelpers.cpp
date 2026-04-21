@@ -54,7 +54,7 @@
         nlen = app_data_len - i;  // remainder of app_data
       }
       if (nlen > 0) {
-        if (nlen > MAX_NAME_SIZE - 1) nlen = MAX_NAME_SIZE - 1;  // Prevent buffer overflow
+        if (nlen > MAX_ADVERT_DATA_SIZE - 1) nlen = MAX_ADVERT_DATA_SIZE - 1;  // Prevent buffer overflow
         memcpy(_name, &app_data[i], nlen);
         _name[nlen] = 0;  // set null terminator
       }
