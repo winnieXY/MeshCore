@@ -3,6 +3,7 @@
 
 #include <bluefruit.h>
 #include <nrf_soc.h>
+#include <nrf_sdm.h>
 
 static BLEDfu bledfu;
 
@@ -20,6 +21,28 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
 
 void NRF52Board::begin() {
   startup_reason = BD_STARTUP_NORMAL;
+}
+
+static void nrf52_sd_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+  (void)id; (void)pc; (void)info;
+  NVIC_SystemReset();
+}
+
+bool NRF52Board::enableSoftDeviceForFlash() {
+  uint8_t sd_en = 0;
+  sd_softdevice_is_enabled(&sd_en);
+  if (sd_en) return true;  // already enabled (e.g. by Bluefruit)
+
+  // Use internal RC oscillator — works on all boards, no external 32kHz crystal needed.
+  // Calibration every 4s (rc_ctiv=16 × 0.25s), re-calibrate if temperature changed.
+  nrf_clock_lf_cfg_t clock_cfg = {
+    .source       = NRF_CLOCK_LF_SRC_RC,
+    .rc_ctiv      = 16,
+    .rc_temp_ctiv = 2,
+    .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
+  };
+  uint32_t err = sd_softdevice_enable(&clock_cfg, nrf52_sd_fault_handler);
+  return (err == NRF_SUCCESS);
 }
 
 #ifdef NRF52_POWER_MANAGEMENT

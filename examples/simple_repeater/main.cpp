@@ -32,6 +32,17 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
+#if defined(NRF52_PLATFORM)
+  // Enable SoftDevice for interrupt-safe flash operations.
+  // Without this, NVMC page erases halt the CPU for ~85ms with all
+  // interrupts disabled — any LoRa packet arriving during that window
+  // loses its DIO1 interrupt and the radio goes permanently deaf.
+  // SD breaks flash operations into small timeslots (~19us each) so
+  // interrupts are serviced between them.  Must be called BEFORE
+  // board.begin() so that DCDC and power management use SD APIs.
+  NRF52Board::enableSoftDeviceForFlash();
+#endif
+
   board.begin();
 
 #if defined(MESH_DEBUG) && defined(NRF52_PLATFORM)

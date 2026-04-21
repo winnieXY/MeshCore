@@ -22,6 +22,10 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
+#if defined(NRF52_PLATFORM)
+  NRF52Board::enableSoftDeviceForFlash();
+#endif
+
   board.begin();
 
 #ifdef DISPLAY_CLASS
