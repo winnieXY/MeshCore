@@ -1,16 +1,16 @@
 --- a/src/helpers/CommonCLI.h
 +++ b/src/helpers/CommonCLI.h
-@@ -8,6 +8,10 @@
+@@ -9,6 +9,10 @@
+ #if defined(WITH_RS232_BRIDGE) || defined(WITH_ESPNOW_BRIDGE)
  #define WITH_BRIDGE
  #endif
- 
++
 +// Smallest reply buffer among all callers (serial main.cpp: char reply[160]).
 +// Used by snprintf() in CLI handlers to prevent stack buffer overflows.
 +#define CLI_REPLY_MAX  160
-+
+ 
  #define ADVERT_LOC_NONE       0
  #define ADVERT_LOC_SHARE      1
- #define ADVERT_LOC_PREFS      2
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -726,7 +726,7 @@
@@ -22,7 +22,8 @@
    }
  }
  
-@@ -784,11 +784,13 @@
+@@ -784,10 +784,10 @@
+   } else if (memcmp(config, "direct.txdelay", 14) == 0) {
      sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
    } else if (memcmp(config, "owner.info", 10) == 0) {
 -    *reply++ = '>';
@@ -35,9 +36,7 @@
        *reply++ = (*sp == '\n') ? '|' : *sp;    // translate newline back to orig '|'
        sp++;
      }
-     *reply = 0;  // set null terminator
-   } else if (memcmp(config, "path.hash.mode", 14) == 0) {
-@@ -887,7 +889,7 @@
+@@ -887,7 +887,7 @@
      strcpy(reply, "ERROR: Power management not supported");
  #endif
    } else {
@@ -45,3 +44,4 @@
 +    snprintf(reply, CLI_REPLY_MAX, "??: %.128s", config);
    }
  }
+ 

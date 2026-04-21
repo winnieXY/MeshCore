@@ -1,6 +1,7 @@
 --- a/src/Dispatcher.h
 +++ b/src/Dispatcher.h
-@@ -85,6 +85,7 @@
+@@ -84,6 +84,7 @@
+ */
  class PacketManager {
  public:
 +  virtual ~PacketManager() { }
@@ -9,13 +10,7 @@
  
 --- a/src/helpers/StaticPoolPacketManager.h
 +++ b/src/helpers/StaticPoolPacketManager.h
-@@ -4,6 +4,7 @@
- 
- class PacketQueue {
-   mesh::Packet** _table;
-   uint8_t* _pri_table;
-   uint32_t* _schedule_table;
-   int _size, _num;
+@@ -10,6 +10,7 @@
  
  public:
    PacketQueue(int max_entries);
@@ -23,38 +18,30 @@
    mesh::Packet* get(uint32_t now);
    bool add(mesh::Packet* packet, uint8_t priority, uint32_t scheduled_for);
    int count() const { return _num; }
-@@ -21,6 +22,7 @@
- class StaticPoolPacketManager : public mesh::PacketManager {
-   PacketQueue unused, send_queue, rx_queue;
+@@ -23,6 +24,7 @@
  
  public:
    StaticPoolPacketManager(int pool_size);
 +  ~StaticPoolPacketManager() override;
  
    mesh::Packet* allocNew() override;
+   void free(mesh::Packet* packet) override;
 --- a/src/helpers/StaticPoolPacketManager.cpp
 +++ b/src/helpers/StaticPoolPacketManager.cpp
-@@ -3,6 +3,13 @@
- PacketQueue::PacketQueue(int max_entries) {
-   _table = new mesh::Packet*[max_entries];
-   _pri_table = new uint8_t[max_entries];
+@@ -6,6 +6,12 @@
    _schedule_table = new uint32_t[max_entries];
    _size = max_entries;
    _num = 0;
- }
- 
++}
++
 +PacketQueue::~PacketQueue() {
 +  delete[] _table;
 +  delete[] _pri_table;
 +  delete[] _schedule_table;
-+}
-+
+ }
+ 
  int PacketQueue::countBefore(uint32_t now) const {
-@@ -71,6 +78,15 @@
- StaticPoolPacketManager::StaticPoolPacketManager(int pool_size): unused(pool_size), send_queue(pool_size), rx_queue(pool_size) {
-   // load up our unusued Packet pool
-   for (int i = 0; i < pool_size; i++) {
-     unused.add(new mesh::Packet(), 0, 0);
+@@ -75,6 +81,15 @@
    }
  }
  
@@ -68,3 +55,5 @@
 +}
 +
  mesh::Packet* StaticPoolPacketManager::allocNew() {
+   return unused.removeByIdx(0);  // just get first one (returns NULL if empty)
+ }

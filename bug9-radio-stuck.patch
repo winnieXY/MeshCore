@@ -14,16 +14,7 @@ This covers:
 
 --- a/src/Dispatcher.cpp
 +++ b/src/Dispatcher.cpp
-@@ -73,12 +73,25 @@ void Dispatcher::loop() {
-   _radio->loop();
- 
-   // check for radio 'stuck' in mode other than Rx
-   bool is_recv = _radio->isInRecvMode();
-   if (is_recv != prev_isrecv_mode) {
-     prev_isrecv_mode = is_recv;
-     if (!is_recv) {
-       radio_nonrx_start = _ms->getMillis();
-     }
+@@ -80,6 +80,22 @@
    }
    if (!is_recv && _ms->getMillis() - radio_nonrx_start > 8000) {   // radio has not been in Rx mode for 8 seconds!
      _err_flags |= ERR_EVENT_STARTRX_TIMEOUT;

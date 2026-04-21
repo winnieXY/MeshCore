@@ -1,6 +1,6 @@
 --- a/src/helpers/AdvertDataHelpers.cpp
 +++ b/src/helpers/AdvertDataHelpers.cpp
-@@ -29,18 +29,24 @@
+@@ -29,22 +29,25 @@
    AdvertDataParser::AdvertDataParser(const uint8_t app_data[], uint8_t app_data_len) {
      _name[0] = 0;
      _lat = _lon = 0;

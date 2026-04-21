@@ -11,11 +11,20 @@ Non-breaking: The wire frame format is unchanged. Only behavior for
 invalid (oversized) frames changes from "silent truncation" to
 "silent discard".
 
+Note: An alternative early-reject approach (checking in RECV_STATE_LEN1_FOUND)
+is also possible but leaves unframed bytes in the serial buffer.  The
+late-reject approach below is preferred because it properly consumes all
+bytes before discarding.
+
+Notes:
+  1. SerialWifiInterface already handles this correctly (logs and skips).
+  2. BLE interfaces don't have this issue (MTU negotiation limits frames).
+  3. writeFrame() already rejects oversized outbound frames (returns 0).
+
 
 --- a/src/helpers/ArduinoSerialInterface.cpp
 +++ b/src/helpers/ArduinoSerialInterface.cpp
-@@ checkRecvFrame() — replace the default case (lines 59-70)
-
+@@ -59,13 +59,18 @@
        default:
          if (rx_len < MAX_FRAME_SIZE) {
            rx_buf[rx_len] = (uint8_t)c;   // rest of frame will be discarded if > MAX
@@ -36,50 +45,5 @@ invalid (oversized) frames changes from "silent truncation" to
 +          _state = RECV_STATE_IDLE;  // reset state, for next frame
 +          return _frame_len;
          }
-
-
-An alternative, more defensive approach is to reject the frame as soon
-as the length header is parsed (in RECV_STATE_LEN1_FOUND), avoiding
-reading the oversized payload at all:
-
---- a/src/helpers/ArduinoSerialInterface.cpp (alternative: early reject)
-+++ b/src/helpers/ArduinoSerialInterface.cpp
-@@ checkRecvFrame() — in the LEN1_FOUND case (lines 54-57)
-
-       case RECV_STATE_LEN1_FOUND:
-         _frame_len |= ((uint16_t)c) << 8;   // MSB
-         rx_len = 0;
--        _state = _frame_len > 0 ? RECV_STATE_LEN2_FOUND : RECV_STATE_IDLE;
-+        if (_frame_len == 0 || _frame_len > MAX_FRAME_SIZE) {
-+          _state = RECV_STATE_IDLE;  // reject zero-length or oversized frames
-+        } else {
-+          _state = RECV_STATE_LEN2_FOUND;
-+        }
-         break;
-
-NOTE: The early-reject approach is simpler but has a subtle issue: the
-remaining bytes of the oversized frame are still in the serial buffer.
-They will be interpreted as a new frame header search, which is safe
-(the '<' search in RECV_STATE_IDLE will skip non-marker bytes) but
-may cause a brief period of misaligned parsing until the junk bytes
-are consumed. The late-reject approach (reading and discarding the
-full frame) avoids this by properly consuming all bytes.
-
-Recommendation: Use the late-reject approach (first patch) for clean
-byte-stream alignment, or combine both approaches for belt-and-suspenders
-defense.
-
-
-=== Notes ===
-
-1. The SerialWifiInterface already handles this correctly at line 131:
-     if(frame_length > MAX_FRAME_SIZE){
-       WIFI_DEBUG_PRINTLN("Skipping frame: length=%d ...", frame_length, MAX_FRAME_SIZE);
-       // ... skips the frame
-   This patch brings ArduinoSerialInterface in line with that behavior.
-
-2. The BLE interfaces (both ESP32 and nRF52) don't have this issue
-   because BLE MTU negotiation naturally limits frame sizes.
-
-3. writeFrame() already rejects oversized outbound frames (returns 0).
-   This patch makes inbound handling consistent.
+     }
+   }

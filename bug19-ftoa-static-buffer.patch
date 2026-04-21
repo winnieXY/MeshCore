@@ -6,114 +6,91 @@ instead of returning a pointer to a shared static buffer. This makes
 multiple calls in the same expression safe by definition.
 
 Non-breaking: No wire protocol change. Only internal API change.
+All 9 call sites in CommonCLI.cpp are updated to pass a local char[16] buffer.
 
 
 --- a/src/helpers/TxtDataHelpers.h
 +++ b/src/helpers/TxtDataHelpers.h
-@@ -16,2 +16,2 @@
+@@ -13,8 +13,8 @@
+ public:
+   static void strncpy(char* dest, const char* src, size_t buf_sz);
+   static void strzcpy(char* dest, const char* src, size_t buf_sz);   // pads with trailing nulls
 -  static const char* ftoa(float f);
--  static const char* ftoa3(float f);
+-  static const char* ftoa3(float f); //Converts float to string with 3 decimal places
 +  static char* ftoa(char* buf, float f);
-+  static char* ftoa3(char* buf, float f);
-
-
++  static char* ftoa3(char* buf, float f); //Converts float to string with 3 decimal places
+   static bool isBlank(const char* str);
+   static uint32_t fromHex(const char* src);
+ };
 --- a/src/helpers/TxtDataHelpers.cpp
 +++ b/src/helpers/TxtDataHelpers.cpp
-@@ ftoa()
+@@ -129,8 +129,7 @@
+   *p = 0;
+ }
+ 
 -const char* StrHelper::ftoa(float f) {
 -  static char tmp[16];
 +char* StrHelper::ftoa(char* tmp, float f) {
    int status;
    _ftoa(f, tmp, &status);
    if (status) {
-     tmp[0] = '0';
-     tmp[1] = 0;
-   }
+@@ -140,12 +139,11 @@
    return tmp;
  }
-
-@@ ftoa3()
+ 
 -const char* StrHelper::ftoa3(float f) {
 -  static char s[16];
--  int v = (int)(f * 1000.0f + (f >= 0 ? 0.5f : -0.5f));
--  int w = v / 1000;
--  int d = abs(v % 1000);
--  snprintf(s, sizeof(s), "%d.%03d", w, d);
--  for (int i = strlen(s) - 1; i > 0 && s[i] == '0'; i--)
--      s[i] = 0;
--  int L = strlen(s);
--  if (s[L - 1] == '.') s[L - 1] = 0;
--  return s;
 +char* StrHelper::ftoa3(char* s, float f) {
-+  int v = (int)(f * 1000.0f + (f >= 0 ? 0.5f : -0.5f));
-+  int w = v / 1000;
-+  int d = abs(v % 1000);
+   int v = (int)(f * 1000.0f + (f >= 0 ? 0.5f : -0.5f)); // rounded ×1000
+   int w = v / 1000;                                     // whole
+   int d = abs(v % 1000);                                // decimals
+-  snprintf(s, sizeof(s), "%d.%03d", w, d);
 +  snprintf(s, 16, "%d.%03d", w, d);
-+  for (int i = strlen(s) - 1; i > 0 && s[i] == '0'; i--)
-+      s[i] = 0;
-+  int L = strlen(s);
-+  if (s[L - 1] == '.') s[L - 1] = 0;
-+  return s;
- }
-
-
+   for (int i = strlen(s) - 1; i > 0 && s[i] == '0'; i--)
+       s[i] = 0;
+   int L = strlen(s);
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
- (Update all 9 call sites -- each declares a local char[16] buffer)
-
-@@ line 741 (airtime)
+@@ -738,7 +738,7 @@
+     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
+     sprintf(reply, "> %d.%d%%", dc_int, dc_frac);
+   } else if (memcmp(config, "af", 2) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->airtime_factor)); }
-
-@@ line 766 (lat)
+   } else if (memcmp(config, "int.thresh", 10) == 0) {
+     sprintf(reply, "> %d", (uint32_t) _prefs->interference_threshold);
+   } else if (memcmp(config, "agc.reset.interval", 18) == 0) {
+@@ -763,26 +763,26 @@
+   } else if (memcmp(config, "repeat", 6) == 0) {
+     sprintf(reply, "> %s", _prefs->disable_fwd ? "off" : "on");
+   } else if (memcmp(config, "lat", 3) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->node_lat));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->node_lat)); }
-
-@@ line 768 (lon)
+   } else if (memcmp(config, "lon", 3) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->node_lon));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->node_lon)); }
-
-@@ lines 775-778 (radio -- already had workaround, now simplified)
--    char freq[16], bw[16];
+ #if defined(USE_SX1262) || defined(USE_SX1268)
+   } else if (memcmp(config, "radio.rxgain", 12) == 0) {
+     sprintf(reply, "> %s", _prefs->rx_boosted_gain ? "on" : "off");
+ #endif
+   } else if (memcmp(config, "radio", 5) == 0) {
+     char freq[16], bw[16];
 -    strcpy(freq, StrHelper::ftoa(_prefs->freq));
 -    strcpy(bw, StrHelper::ftoa3(_prefs->bw));
--    sprintf(reply, "> %s,%s,%d,%d", freq, bw, (uint32_t)_prefs->sf, (uint32_t)_prefs->cr);
-+    char freq[16], bw[16];
 +    StrHelper::ftoa(freq, _prefs->freq);
 +    StrHelper::ftoa3(bw, _prefs->bw);
-+    sprintf(reply, "> %s,%s,%d,%d", freq, bw, (uint32_t)_prefs->sf, (uint32_t)_prefs->cr);
-
-@@ line 779 (rxdelay)
+     sprintf(reply, "> %s,%s,%d,%d", freq, bw, (uint32_t)_prefs->sf, (uint32_t)_prefs->cr);
+   } else if (memcmp(config, "rxdelay", 7) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->rx_delay_base));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->rx_delay_base)); }
-
-@@ line 781 (txdelay)
+   } else if (memcmp(config, "txdelay", 7) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->tx_delay_factor));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->tx_delay_factor)); }
-
-@@ line 785 (direct.txdelay)
+   } else if (memcmp(config, "flood.max", 9) == 0) {
+     sprintf(reply, "> %d", (uint32_t)_prefs->flood_max);
+   } else if (memcmp(config, "direct.txdelay", 14) == 0) {
 -    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->direct_tx_delay_factor));
 +    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->direct_tx_delay_factor)); }
-
-@@ line 810 (freq)
--    sprintf(reply, "> %s", StrHelper::ftoa(_prefs->freq));
-+    { char tmp[16]; sprintf(reply, "> %s", StrHelper::ftoa(tmp, _prefs->freq)); }
-
-
-=== Notes ===
-
-1. The returned char* still points to the caller-provided buffer, so
-   the calling pattern remains familiar: sprintf(..., ftoa(buf, val)).
-
-2. Each call site allocates a 16-byte stack buffer (same size as the
-   original static buffer). Stack cost: 16 bytes per call scope,
-   freed immediately on return. No heap allocation.
-
-3. The "radio" getter (lines 775-778) originally needed an explicit
-   strcpy workaround because ftoa and ftoa3 shared static buffers.
-   With the new API, freq[] and bw[] are written directly by the
-   functions, eliminating the strcpy.
-
-4. Future callers can safely use multiple ftoa calls in one expression:
-     char a[16], b[16];
-     sprintf(reply, "%s,%s", ftoa(a, lat), ftoa(b, lon));  // safe!
+   } else if (memcmp(config, "owner.info", 10) == 0) {
+     *reply++ = '>';
+     *reply++ = ' ';

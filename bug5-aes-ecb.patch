@@ -23,10 +23,24 @@ Coverage:
     single ciphertext block is now non-deterministic.
   - Longer messages: last block mitigated, earlier blocks unchanged.
 
+Safety Analysis -- all callers of MACThenDecrypt() are safe with
+random padding bytes:
+
+  1. TEXT MESSAGES (TXT_MSG, GRP_TXT): Callers write data[len]=0 for
+     null termination, then use the text as a C string via strlen().
+     Random padding is never read.
+  2. GROUP DATA (GRP_DATA): Has an explicit data_len field at data[2].
+     Padding ignored.
+  3. REQUESTS (REQ): Handlers read fixed offsets; padded len unused.
+  4. RESPONSES (RESPONSE): Already copies up to 15 padding bytes
+     (zero before, random now); companion app parses by type code.
+  5. PATH (extra=ACK): Only reads first 4 bytes.
+  6. PATH (extra=RESPONSE): Delegates to onContactResponse (case 4).
+
 
 --- a/src/Utils.cpp
 +++ b/src/Utils.cpp
-@@ encrypt()
+@@ -53,7 +53,7 @@ int Utils::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t*
    if (src_len > 0) {  // remaining partial block
      uint8_t tmp[16];
 -    memset(tmp, 0, 16);
@@ -35,37 +49,6 @@ Coverage:
      aes.encryptBlock(dp, tmp);
      dp += 16;
    }
-
-
-=== Safety Analysis ===
-
-All callers of MACThenDecrypt() are safe with random padding bytes:
-
-1. TEXT MESSAGES (TXT_MSG, GRP_TXT): Callers write data[len]=0 for
-   null termination, then use the text as a C string via strlen().
-   The original null terminator inside the text stops string parsing
-   before any padding bytes. Random padding is never read.
-
-2. GROUP DATA (GRP_DATA): Has an explicit data_len field at data[2].
-   The ECB-padded len is only used for bounds validation; actual data
-   extent is determined by the inner length field. Padding ignored.
-
-3. REQUESTS (REQ): Handlers read fixed offsets (data[0], data[1])
-   based on request type codes. The padded len is not used to
-   determine how much data to read. Padding irrelevant.
-
-4. RESPONSES (RESPONSE): memcpy(&out_frame[i], &data[4], len-4)
-   copies padding bytes into the serial frame. This already happens
-   with zero-padding (up to 15 extra bytes). Random bytes instead of
-   zeros are functionally equivalent -- the companion app parses
-   response data by type code and inner structure, not raw frame
-   length. The meshcore_py reader uses explicit per-response-type
-   parsing.
-
-5. PATH (extra=ACK): Only reads first 4 bytes. Padding irrelevant.
-
-6. PATH (extra=RESPONSE): Delegates to onContactResponse -- same as
-   case 4 above.
 
 
 === Future Work: Full Fix (Protocol v2) ===

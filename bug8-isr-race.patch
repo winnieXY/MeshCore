@@ -21,7 +21,7 @@
  }
  
  void RadioLibWrapper::triggerNoiseFloorCalibrate(int threshold) {
-@@ -59,10 +62,14 @@
+@@ -59,10 +62,15 @@
  
  void RadioLibWrapper::resetAGC() {
    // make sure we're not mid-receive of packet!
@@ -38,7 +38,7 @@
  
    // Reset noise floor sampling so it reconverges from scratch.
    // Without this, a stuck _noise_floor of -120 makes the sampling threshold
-@@ -74,7 +81,9 @@
+@@ -74,7 +82,10 @@
  }
  
  void RadioLibWrapper::loop() {
@@ -50,7 +50,7 @@
      if (!isReceivingPacket()) {
        int rssi = getCurrentRSSI();
        if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
-@@ -95,28 +104,40 @@
+@@ -96,19 +107,33 @@
  void RadioLibWrapper::startRecv() {
    int err = _radio->startReceive();
    if (err == RADIOLIB_ERR_NONE) {
@@ -87,9 +87,7 @@
      len = _radio->getPacketLength();
      if (len > 0) {
        if (len > sz) { len = sz; }
-       int err = _radio->readData(bytes, len);
-       if (err != RADIOLIB_ERR_NONE) {
-         MESH_DEBUG_PRINTLN("RadioLibWrapper: error: readData(%d)", err);
+@@ -118,17 +143,27 @@
          len = 0;
          n_recv_errors++;
        } else {
@@ -98,12 +96,14 @@
        }
      }
 -    state = STATE_IDLE;   // need another startReceive()
+-  }
+-
+-  if (state != STATE_RX) {
 +    noInterrupts();
 +    state = STATE_IDLE;     // need another startReceive()
 +    interrupts();
-   }
- 
--  if (state != STATE_RX) {
++  }
++
 +  noInterrupts();
 +  s = state;
 +  interrupts();
@@ -121,35 +121,32 @@
      } else {
        MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startReceive(%d)", err);
      }
-@@ -133,7 +154,9 @@
- bool RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
+@@ -144,7 +179,9 @@
    _board->onBeforeTransmit();
    int err = _radio->startTransmit((uint8_t *) bytes, len);
    if (err == RADIOLIB_ERR_NONE) {
--    state = STATE_TX_WAIT;
 +    noInterrupts();
-+    state = STATE_TX_WAIT;
+     state = STATE_TX_WAIT;
 +    interrupts();
      return true;
    }
    MESH_DEBUG_PRINTLN("RadioLibWrapper: error: startTransmit(%d)", err);
-@@ -143,16 +166,22 @@
+@@ -154,18 +191,24 @@
  }
  
  bool RadioLibWrapper::isSendComplete() {
 -  if (state & STATE_INT_READY) {
--    state = STATE_IDLE;
--    n_sent++;
--    return true;
 +  noInterrupts();
 +  bool done = (state & STATE_INT_READY) != 0;
 +  if (done) {
-+    state = STATE_IDLE;
-   }
--  return false;
+     state = STATE_IDLE;
++  }
 +  interrupts();
 +  if (done) {
-+    n_sent++;
+     n_sent++;
+-    return true;
+-  }
+-  return false;
 +  }
 +  return done;
  }
@@ -161,3 +158,5 @@
    state = STATE_IDLE;
 +  interrupts();
  }
+ 
+ bool RadioLibWrapper::isChannelActive() {

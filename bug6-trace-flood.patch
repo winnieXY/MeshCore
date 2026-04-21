@@ -1,22 +1,22 @@
 --- a/src/Mesh.h
 +++ b/src/Mesh.h
-@@ -27,6 +27,11 @@
- class Mesh : public Dispatcher {
+@@ -27,6 +27,12 @@
    RTCClock* _rtc;
    RNG* _rng;
    MeshTables* _tables;
- 
++
 +  // TRACE forwarding rate limiter (Bug #6 fix)
 +  static const int TRACE_RATE_LIMIT = 4;           // max forwards per window
 +  static const unsigned long TRACE_RATE_WINDOW_MS = 10000;  // 10-second window
 +  int _trace_fwd_count = 0;
 +  unsigned long _trace_window_start = 0;
-+
+ 
    void removeSelfFromPath(Packet* packet);
    void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
 --- a/src/Mesh.cpp
 +++ b/src/Mesh.cpp
-@@ -42,6 +42,18 @@
+@@ -41,6 +41,18 @@
+ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
    if (pkt->isRouteDirect() && pkt->getPayloadType() == PAYLOAD_TYPE_TRACE) {
      if (pkt->path_len < MAX_PATH_SIZE) {
 +      // Rate-limit TRACE forwarding to prevent flood DoS (Bug #6)

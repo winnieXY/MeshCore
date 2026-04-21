@@ -1,7 +1,6 @@
 --- a/src/helpers/BaseChatMesh.cpp
 +++ b/src/helpers/BaseChatMesh.cpp
-@@ -213,8 +213,11 @@ void BaseChatMesh::onPeerDataRecv(mesh::Packet* packet, uint8_t type, int sende
-     uint32_t timestamp;
+@@ -211,8 +211,11 @@
      memcpy(&timestamp, data, 4);  // timestamp (by sender's RTC clock - which could be wrong)
      uint8_t flags = data[4] >> 2;   // message attempt number, and other flags
  
@@ -15,7 +14,7 @@
  
      if (flags == TXT_TYPE_PLAIN) {
        from.lastmod = getRTCClock()->getCurrentTime(); // update last heard time
-@@ -371,8 +374,11 @@ void BaseChatMesh::onGroupDataRecv(mesh::Packet* packet, uint8_t type, const me
+@@ -368,8 +371,11 @@
      uint32_t timestamp;
      memcpy(&timestamp, data, 4);
  
@@ -31,7 +30,7 @@
      onChannelMessageRecv(channel, packet, timestamp, (const char *) &data[5]);  // let UI know
 --- a/src/Utils.cpp
 +++ b/src/Utils.cpp
-@@ -30,11 +30,14 @@ int Utils::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t*
+@@ -31,14 +31,15 @@
    AES128 aes;
    uint8_t* dp = dest;
    const uint8_t* sp = src;
@@ -47,3 +46,5 @@
 -  return sp - src;  // will always be multiple of 16
 +  return max_bytes;  // always a multiple of 16, never larger than src_len
  }
+ 
+ int Utils::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {

@@ -16,43 +16,46 @@ Applied to: simple_repeater, simple_room_server, simple_sensor
 
 --- a/src/Dispatcher.h
 +++ b/src/Dispatcher.h
-@@ -69,6 +69,12 @@ public:
+@@ -68,6 +68,12 @@
+   virtual void resetAGC() { }
  
    virtual bool isInRecvMode() const = 0;
- 
++
 +  /**
 +   * \brief  Put radio into standby.  Next recvRaw() call will restart receive.
 +   *         Used to quiesce the SPI bus before flash I/O on nRF52.
 +  */
 +  virtual void suspendRadio() { }
-+
+ 
    /**
     * \returns  true if the radio is currently mid-receive of a packet.
-   */
-@@ -185,6 +191,9 @@ public:
- 
-   // helper methods
+@@ -193,6 +199,9 @@
    bool millisHasNowPassed(unsigned long timestamp) const;
    unsigned long futureMillis(int millis_from_now) const;
-+
+ 
 +  /// True when a packet is mid-transmit (dequeued, SPI active).
 +  bool isRadioBusy() const { return outbound != NULL; }
- 
++
  private:
    bool tryParsePacket(Packet* pkt, const uint8_t* raw, int len);
+   void checkRecv();
 --- a/src/helpers/radiolib/RadioLibWrappers.h
 +++ b/src/helpers/radiolib/RadioLibWrappers.h
-@@ -29,6 +29,7 @@ public:
+@@ -29,9 +29,10 @@
    bool isSendComplete() override;
    void onSendFinished() override;
    bool isInRecvMode() const override;
 +  void suspendRadio() override { idle(); }
    bool isChannelActive();
  
-   bool isReceiving() override {
+-  bool isReceiving() override { 
++  bool isReceiving() override {
+     if (isReceivingPacket()) return true;
+ 
+     return isChannelActive();
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
-@@ -1291,8 +1297,17 @@ void MyMesh::loop() {
+@@ -1291,8 +1291,21 @@
  
    // is pending dirty contacts write needed?
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
@@ -78,12 +81,17 @@ Applied to: simple_repeater, simple_room_server, simple_sensor
    // update uptime
 --- a/examples/simple_repeater/MyMesh.h
 +++ b/examples/simple_repeater/MyMesh.h
-@@ -105,6 +105,7 @@
+@@ -103,6 +103,7 @@
+   unsigned long pending_discover_until;
+   bool region_load_active;
    unsigned long dirty_contacts_expiry;
 +  uint8_t dirty_contacts_defer_count;
+ #if MAX_NEIGHBOURS
+   NeighbourInfo neighbours[MAX_NEIGHBOURS];
+ #endif
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
-@@ -1011,8 +1017,17 @@ void MyMesh::loop() {
+@@ -1011,8 +1011,20 @@
  
    // is pending dirty contacts write needed?
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
@@ -108,17 +116,24 @@ Applied to: simple_repeater, simple_room_server, simple_sensor
    // TODO: periodically check for OLD/inactive entries in known_clients[], and evict
 --- a/examples/simple_room_server/MyMesh.h
 +++ b/examples/simple_room_server/MyMesh.h
-@@ -103,6 +103,7 @@
+@@ -101,6 +101,7 @@
+   ClientACL acl;
+   CommonCLI _cli;
    unsigned long dirty_contacts_expiry;
 +  uint8_t dirty_contacts_defer_count;
+   uint8_t reply_data[MAX_PACKET_PAYLOAD];
+   unsigned long next_push;
+   uint16_t _num_posted, _num_post_pushes;
 --- a/examples/simple_sensor/SensorMesh.cpp
 +++ b/examples/simple_sensor/SensorMesh.cpp
-@@ -968,8 +974,17 @@ void SensorMesh::loop() {
+@@ -968,7 +968,19 @@
  
    // is there are pending dirty contacts write needed?
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
 -    acl.save(_fs);
 -    dirty_contacts_expiry = 0;
+-  }
+-}
 +    if (_mgr->getOutboundTotal() > 0 || isRadioBusy()) {
 +      dirty_contacts_expiry = futureMillis(200);
 +      if (++dirty_contacts_defer_count > 50) {
@@ -133,5 +148,5 @@ Applied to: simple_repeater, simple_room_server, simple_sensor
 +      dirty_contacts_expiry = 0;
 +      dirty_contacts_defer_count = 0;
 +    }
-   }
- }
++  }
++}

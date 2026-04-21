@@ -1,38 +1,37 @@
---- Bug #14 — Patch: Increase Group Channel Hash From 1 Byte to 4 Bytes
----
---- Root cause:
----   PATH_HASH_SIZE = 1 is used for both routing identity hashes AND group
----   channel identification.  For routing, 1 byte is a deliberate trade-off
----   (small packets, collision handled by MAC).  For group channels, it means
----   any forged group packet has a 1-in-256 chance of matching a local channel,
----   and the only remaining protection is a 2-byte HMAC — brute-forceable in
----   ~65,536 attempts.
----
---- Fix:
----   Introduce CHANNEL_HASH_SIZE = 4 (separate from PATH_HASH_SIZE = 1) for
----   group channel identification.  This raises the collision probability from
----   1/256 to 1/4,294,967,296.  Combined with the 2-byte MAC, blind injection
----   now requires ~2.8 × 10^14 attempts — infeasible at any radio speed.
----
----   The cost is 3 extra bytes per group message payload (MAX_GROUP_DATA_LENGTH
----   drops from 165 to 162 bytes).
----
---- Protocol compatibility:
----   This is a BREAKING CHANGE.  Nodes with this patch cannot exchange group
----   messages with unpatched nodes.  All nodes in a mesh must be updated
----   together.  Direct messages and routing are NOT affected (PATH_HASH_SIZE
----   unchanged).
----
---- Files changed:
----   src/MeshCore.h             — Add CHANNEL_HASH_SIZE, update MAX_GROUP_DATA_LENGTH
----   src/Mesh.h                 — GroupChannel::hash uses CHANNEL_HASH_SIZE
----   src/Mesh.cpp               — createGroupDatagram + onRecvPacket use CHANNEL_HASH_SIZE
----   src/helpers/BaseChatMesh.cpp — searchChannelsByHash uses memcmp over full hash
+Bug #14 — Patch: Increase Group Channel Hash From 1 Byte to 4 Bytes
+
+Root cause:
+  PATH_HASH_SIZE = 1 is used for both routing identity hashes AND group
+  channel identification.  For routing, 1 byte is a deliberate trade-off
+  (small packets, collision handled by MAC).  For group channels, it means
+  any forged group packet has a 1-in-256 chance of matching a local channel,
+  and the only remaining protection is a 2-byte HMAC — brute-forceable in
+  ~65,536 attempts.
+
+Fix:
+  Introduce CHANNEL_HASH_SIZE = 4 (separate from PATH_HASH_SIZE = 1) for
+  group channel identification.  This raises the collision probability from
+  1/256 to 1/4,294,967,296.  Combined with the 2-byte MAC, blind injection
+  now requires ~2.8 × 10^14 attempts — infeasible at any radio speed.
+
+  The cost is 3 extra bytes per group message payload (MAX_GROUP_DATA_LENGTH
+  drops from 165 to 162 bytes).
+
+Protocol compatibility:
+  This is a BREAKING CHANGE.  Nodes with this patch cannot exchange group
+  messages with unpatched nodes.  All nodes in a mesh must be updated
+  together.  Direct messages and routing are NOT affected (PATH_HASH_SIZE
+  unchanged).
+
+Files changed:
+  src/MeshCore.h             — Add CHANNEL_HASH_SIZE, update MAX_GROUP_DATA_LENGTH
+  src/Mesh.h                 — GroupChannel::hash uses CHANNEL_HASH_SIZE
+  src/Mesh.cpp               — createGroupDatagram + onRecvPacket use CHANNEL_HASH_SIZE
+  src/helpers/BaseChatMesh.cpp — searchChannelsByHash uses memcmp over full hash
 
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -14,9 +14,10 @@
- 
+@@ -15,9 +15,10 @@
  // V1
  #define CIPHER_MAC_SIZE      2
  #define PATH_HASH_SIZE       1
@@ -44,10 +43,10 @@
 +#define MAX_GROUP_DATA_LENGTH  (MAX_PACKET_PAYLOAD - CIPHER_BLOCK_SIZE - CHANNEL_HASH_SIZE - CIPHER_MAC_SIZE)
  #define MAX_PATH_SIZE        64
  #define MAX_TRANS_UNIT      255
-
+ 
 --- a/src/Mesh.h
 +++ b/src/Mesh.h
-@@ -7,7 +7,7 @@
+@@ -6,7 +6,7 @@
  
  class GroupChannel {
  public:
@@ -55,19 +54,20 @@
 +  uint8_t hash[CHANNEL_HASH_SIZE];
    uint8_t secret[PUB_KEY_SIZE];
  };
-
+ 
 --- a/src/Mesh.cpp
 +++ b/src/Mesh.cpp
-@@ -213,8 +213,10 @@
+@@ -213,15 +213,17 @@
      case PAYLOAD_TYPE_GRP_DATA: 
      case PAYLOAD_TYPE_GRP_TXT: {
        int i = 0;
 -      uint8_t channel_hash = pkt->payload[i++];
+-
+-      uint8_t* macAndData = &pkt->payload[i];   // MAC + encrypted data 
 +      uint8_t channel_hash[CHANNEL_HASH_SIZE];
 +      if (i + CHANNEL_HASH_SIZE > pkt->payload_len) break;  // too short
 +      memcpy(channel_hash, &pkt->payload[i], CHANNEL_HASH_SIZE); i += CHANNEL_HASH_SIZE;
- 
--      uint8_t* macAndData = &pkt->payload[i];   // MAC + encrypted data 
++
 +      uint8_t* macAndData = &pkt->payload[i];   // MAC + encrypted data
        if (i + 2 >= pkt->payload_len) {
          MESH_DEBUG_PRINTLN("%s Mesh::onRecvPacket(): incomplete data packet", getLogDateTime());
@@ -78,7 +78,9 @@
 +        int num = searchChannelsByHash(channel_hash, channels, 4);
          // for each matching channel, try to decrypt data
          for (int j = 0; j < num; j++) {
-@@ -526,7 +528,7 @@
+           // decrypt, checking MAC is valid
+@@ -525,7 +527,7 @@
+ 
  Packet* Mesh::createGroupDatagram(uint8_t type, const GroupChannel& channel, const uint8_t* data, size_t data_len) {
    if (!(type == PAYLOAD_TYPE_GRP_TXT || type == PAYLOAD_TYPE_GRP_DATA)) return NULL;   // invalid type
 -  if (data_len + 1 + CIPHER_BLOCK_SIZE-1 > MAX_PACKET_PAYLOAD) return NULL; // too long
@@ -86,13 +88,15 @@
  
    Packet* packet = obtainNewPacket();
    if (packet == NULL) {
-@@ -537,7 +539,7 @@
+@@ -535,7 +537,7 @@
+   packet->header = (type << PH_TYPE_SHIFT);  // ROUTE_TYPE_* set later
  
    int len = 0;
 -  memcpy(&packet->payload[len], channel.hash, PATH_HASH_SIZE); len += PATH_HASH_SIZE;
 +  memcpy(&packet->payload[len], channel.hash, CHANNEL_HASH_SIZE); len += CHANNEL_HASH_SIZE;
    len += Utils::encryptThenMAC(channel.secret, &packet->payload[len], data, data_len);
-
+ 
+   packet->payload_len = len;
 --- a/src/helpers/BaseChatMesh.cpp
 +++ b/src/helpers/BaseChatMesh.cpp
 @@ -344,7 +344,7 @@

@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>BugOverview</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<h1 id="meshcore-security-bug-audit">MeshCore Security &amp; Bug
+Audit</h1>
+<p><strong>Audit Date:</strong> April 2026<br />
+<strong>Scope:</strong> <code>MeshCore/src/</code> — core mesh
+networking, packet handling, crypto, CLI, radio wrappers, serial
+interface, bridges<br />
+<strong>Focus:</strong> Security vulnerabilities, programming bugs, and
+issues that can cause device hang / unresponsiveness</p>
+<hr />
+<h2 id="summary-table">Summary Table</h2>
+<table>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 11%" />
+<col style="width: 23%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>Severity</th>
+<th>Fix Size</th>
+<th>Category</th>
+<th>File(s)</th>
+<th>Short Description</th>
+<th>Worst-Case Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>CRITICAL</strong></td>
+<td><strong>S</strong></td>
+<td>Out-of-bounds write</td>
+<td><code>BaseChatMesh.cpp</code></td>
+<td><code>data[len] = 0</code> writes 1 byte past the
+<code>payload[]</code> array on max-length messages</td>
+<td><strong>Crash/reboot</strong> on any node receiving a max-length DM
+or channel message.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>HIGH</strong></td>
+<td><strong>S</strong></td>
+<td>Pool exhaustion → hang</td>
+<td><code>Dispatcher.cpp</code></td>
+<td>Packet pool is finite and not recoverable; exhaustion makes device
+permanently deaf</td>
+<td><strong>Permanent deaf node</strong> — all roles. Rapid burst fills
+pool; node drops all inbound radio.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>HIGH</strong></td>
+<td><strong>S</strong> (partial) / <strong>XL</strong> (full)</td>
+<td>AES-ECB mode</td>
+<td><code>Utils.cpp</code></td>
+<td>Encryption uses AES-128 in ECB mode with no IV/nonce — leaks
+plaintext patterns</td>
+<td><strong>Passive traffic analysis + replay injection</strong> on all
+encrypted messages. Partial mitigation (random padding, 2-line change,
+non-breaking) included. Full fix (AES-CTR) requires protocol version
+bump.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>HIGH</strong></td>
+<td><strong>S</strong></td>
+<td>TRACE flood DoS</td>
+<td><code>Mesh.cpp</code></td>
+<td>Crafted TRACE packets can drain TX budget and packet pool of target
+nodes</td>
+<td><strong>Sustained DoS</strong> on repeaters/room servers.
+Unauthenticated. Self-recovers when flood stops.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>HIGH</strong></td>
+<td><strong>S</strong></td>
+<td>Buffer overflow in CLI</td>
+<td><code>CommonCLI.cpp</code></td>
+<td>Unbounded <code>sprintf</code> into fixed <code>reply</code> buffer
+with attacker-controlled strings</td>
+<td><strong>Crash/reboot or possible code execution</strong> via long
+CLI command over BLE/radio/serial.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>MEDIUM</strong></td>
+<td><strong>M</strong></td>
+<td>ISR race condition</td>
+<td><code>RadioLibWrappers.cpp</code></td>
+<td>Global <code>volatile state</code> modified from ISR and main loop
+without atomic guards</td>
+<td><strong>Single lost radio packet</strong> (self-recovering).
+Practically untriggerable (~20μs window vs ≥10ms demod).</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>HIGH</strong></td>
+<td><strong>S</strong></td>
+<td>Radio stuck — no recovery</td>
+<td><code>Dispatcher.cpp</code></td>
+<td>Radio-not-in-RX detection sets a flag but takes no corrective
+action</td>
+<td><strong>Permanent deaf node</strong> — all roles. 8s timeout fires
+but takes zero recovery action.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>MEDIUM</strong></td>
+<td><strong>S</strong></td>
+<td><code>AdvertDataParser</code> OOB read</td>
+<td><code>AdvertDataHelpers.cpp</code></td>
+<td>Parser reads fields before checking if <code>app_data_len</code> is
+large enough</td>
+<td><strong>Crash/reboot</strong> on malformed advertisement from rogue
+enrolled node.</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>MEDIUM</strong></td>
+<td><strong>S</strong></td>
+<td>TRACE path offset overflow</td>
+<td><code>Mesh.cpp</code></td>
+<td><code>path_len &lt;&lt; path_sz</code> can overflow
+<code>uint8_t</code>, causing OOB payload read</td>
+<td><strong>Crash/reboot or wrong forwarding</strong>. Unauthenticated —
+any SDR can trigger.</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td><code>PacketQueue</code> memory leak</td>
+<td><code>StaticPoolPacketManager.h</code></td>
+<td><code>new[]</code> in constructor but no destructor to
+<code>delete[]</code></td>
+<td><strong>~11 KB leaked per recreation</strong>. Low impact (objects
+created once in current firmware).</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td><code>restoreFrom</code> no validation</td>
+<td><code>SimpleMeshTables.h</code></td>
+<td><code>_next_idx</code> read from file without bounds check —
+corrupted file causes OOB write</td>
+<td><strong>Latent OOB write</strong> — no callers invoke
+<code>restoreFrom()</code> today.</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>MEDIUM</strong></td>
+<td><strong>L</strong> ⚠️ protocol</td>
+<td>Group channel 1-byte hash</td>
+<td><code>BaseChatMesh.cpp</code>, <code>MeshCore.h</code>,
+<code>Mesh.cpp</code></td>
+<td>Channel lookup uses only 1 byte of SHA-256 — brute-force injection
+in ~109 min</td>
+<td><strong>Garbage message injection</strong> to any group channel.
+Unauthenticated. <strong>Breaking change</strong> — all nodes must
+update together.</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td><code>RNG::nextInt</code> modular bias + div-by-zero</td>
+<td><code>Utils.cpp</code></td>
+<td><code>num % (_max - _min)</code> has bias; <code>_max == _min</code>
+causes division by zero</td>
+<td><strong>Latent UB</strong> — not remotely triggerable. All current
+callers safe.</td>
+</tr>
+<tr>
+<td>16</td>
+<td><strong>LOW</strong></td>
+<td><strong>XL</strong> ⚠️ protocol</td>
+<td>No HMAC replay protection</td>
+<td><code>Utils.cpp</code></td>
+<td>No nonce/sequence in MAC; replayed packets accepted after hash table
+cycles</td>
+<td></td>
+</tr>
+<tr>
+<td>17</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td><code>IdentityStore</code> sprintf overflow</td>
+<td><code>IdentityStore.cpp</code></td>
+<td><code>sprintf</code> into 40-byte <code>filename</code> buffer with
+potentially long <code>_dir</code> + <code>name</code></td>
+<td><strong>Latent stack overflow</strong> — not triggerable in current
+firmware.</td>
+</tr>
+<tr>
+<td>18</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td>Passwords in plaintext on flash + echoed in replies</td>
+<td><code>CommonCLI.cpp</code>, <code>BaseChatMesh.cpp</code></td>
+<td>Passwords echoed in encrypted CLI reply and stored unencrypted on
+flash</td>
+<td><strong>Credential exposure</strong> — physical flash access or
+authenticated admin CLI.</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>LOW</strong></td>
+<td><strong>M</strong></td>
+<td><code>ftoa</code> static buffer not reentrant</td>
+<td><code>TxtDataHelpers.cpp</code></td>
+<td><code>static char</code> return buffer overwritten on second call in
+same expression</td>
+<td><strong>Latent wrong CLI response</strong> — not triggerable in
+current firmware.</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>LOW</strong></td>
+<td><strong>S</strong></td>
+<td>Serial frame truncation</td>
+<td><code>ArduinoSerialInterface.cpp</code></td>
+<td>Oversized frames partially captured and returned as valid truncated
+data</td>
+<td><strong>Silent data loss</strong> on long serial messages. No crash,
+no security impact.</td>
+</tr>
+<tr>
+<td>22</td>
+<td><strong>CRITICAL</strong></td>
+<td><strong>L</strong></td>
+<td>Flash write blocks radio during <code>acl.save()</code></td>
+<td><code>ClientACL.cpp</code>, <code>MyMesh.cpp</code></td>
+<td>Synchronous flash erase+write in main loop starves radio; triggers
+on every login</td>
+<td><strong>Permanent radio hang (reboot required)</strong> on nRF52.
+Chains into Bug #9.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fix-size-legend">Fix Size Legend</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 30%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Size</th>
+<th>Meaning</th>
+<th>Typical scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>S</strong></td>
+<td>Small — trivial, low-risk</td>
+<td>1-2 files, &lt;15 lines changed, no API/protocol change</td>
+</tr>
+<tr>
+<td><strong>M</strong></td>
+<td>Medium — moderate refactor</td>
+<td>1-3 files, 15-50 lines, possibly touches multiple call sites</td>
+</tr>
+<tr>
+<td><strong>L</strong></td>
+<td>Large — significant change</td>
+<td>4+ files or 50+ lines, may need careful testing across
+platforms</td>
+</tr>
+<tr>
+<td><strong>XL</strong></td>
+<td>Extra-large — protocol change</td>
+<td>Requires coordinated rollout of all mesh nodes; breaking wire
+format</td>
+</tr>
+<tr>
+<td>⚠️ protocol</td>
+<td>Breaking protocol change</td>
+<td>All nodes in a mesh must update simultaneously or lose interop</td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommended-implementation-order">Recommended Implementation
+Order</h3>
+<p><strong>Tier 1 — Do first (high severity, small fix, immediate
+payoff):</strong> | # | Severity | Fix Size | Why | |—|———-|———-|—–| | 1
+| CRITICAL | S | 1-line bounds check prevents crash on every max-length
+message | | 7 | HIGH | S | <code>sprintf</code> → <code>snprintf</code>
+in 2 files; prevents remote code execution | | 9 | HIGH | S | ~15 lines
+in Dispatcher; prevents permanent deaf node | | 10 | MEDIUM | S | 3-line
+bounds check; prevents unauthenticated crash | | 11 | MEDIUM | S |
+5-line type fix; prevents unauthenticated crash |</p>
+<p><strong>Tier 2 — Do next (high severity, slightly more
+work):</strong> | # | Severity | Fix Size | Why | |—|———-|———-|—–| | 4 |
+HIGH | S | Pool eviction logic in Dispatcher; prevents permanent hang |
+| 6 | HIGH | S | Rate limiter in Mesh.cpp; prevents unauthenticated DoS
+| | 5 | HIGH | S (partial) | 2-line random padding; non-breaking partial
+crypto improvement | | 22 | CRITICAL | L | Flash/radio coordination;
+requires nRF52-specific testing (7 files) |</p>
+<p><strong>Tier 3 — Plan for (lower severity or bigger change):</strong>
+| # | Severity | Fix Size | Why | |—|———-|———-|—–| | 8 | MEDIUM | M |
+ISR critical sections; correct but practically untriggerable race | | 19
+| LOW | M | API change for ftoa; 9 call sites to update; latent-only | |
+15 | LOW | S | Div-by-zero guard; latent-only, all current callers safe
+| | 17 | LOW | S | sprintf → snprintf; latent-only | | 18 | LOW | S |
+Stop echoing password; low-impact credential hardening | | 13 | LOW | S
+| Clamp index after restore; latent-only, no current callers | | 12 |
+LOW | S | Add destructors; affects unit tests mainly | | 20 | LOW | S |
+Reject oversized frame; data-loss-only, no security impact |</p>
+<p><strong>Tier 4 — Long-term / breaking protocol changes:</strong> | #
+| Severity | Fix Size | Why | |—|———-|———-|—–| | 14 | MEDIUM | L ⚠️ |
+Channel hash 1→4 bytes; <strong>all nodes must update together</strong>
+| | 16 | LOW | XL ⚠️ | Add replay nonce to HMAC; <strong>wire format
+change</strong> | | 5 | HIGH | XL (full) | AES-CTR with per-packet
+nonce; <strong>protocol version bump</strong> |</p>
+<hr />
+<h2 id="detailed-findings">Detailed Findings</h2>
+<hr />
+<h3 id="bug-1-critical-out-of-bounds-write-on-text-message-receive">Bug
+#1 — CRITICAL: Out-of-Bounds Write on Text Message Receive</h3>
+<p><strong>File:</strong> <code>src/helpers/BaseChatMesh.cpp</code>
+(lines ~215 and ~372)<br />
+<strong>Impact:</strong> Memory corruption, device crash/hang on
+receiving a max-length text or group text message.</p>
+<p><strong>Worst-Case Outcome:</strong> Any node (repeater, room server,
+sensor, or companion) that receives a max-length DM or channel message
+crashes immediately. The <code>data[len]=0</code> write corrupts the
+stack frame of <code>onRecvPacket()</code>. On nRF52 (ARM Cortex-M4)
+this overwrites saved registers or the return address → HardFault →
+reboot. On ESP32 it may corrupt adjacent stack variables → undefined
+behavior or <code>LoadProhibited</code> exception → reboot. Triggerable
+by any peer who shares a channel secret (channel messages) or any
+contact (DMs). No brute-force needed for normal API traffic — just send
+the longest possible message.</p>
+<p><strong>Description:</strong><br />
+When a text message or group text message is received, the code writes a
+null terminator at <code>data[len]</code> to turn the decrypted payload
+into a C string. The <code>data</code> pointer points into a
+<code>uint8_t data[MAX_PACKET_PAYLOAD]</code> local array (184 bytes).
+If <code>len == MAX_PACKET_PAYLOAD</code> (which is the case when the
+encrypted payload fills the entire packet), this writes one byte past
+the end of the array, corrupting the stack. On embedded devices this can
+overwrite a return address or adjacent local variable, leading to an
+immediate crash or unpredictable behavior.</p>
+<p>The same pattern is repeated in multiple firmware examples
+(<code>simple_repeater</code>, <code>simple_room_server</code>,
+<code>simple_sensor</code>).</p>
+<p><strong>Code (peer text message):</strong></p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// BaseChatMesh.cpp:215 — onPeerDataRecv()</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>type <span class="op">==</span> PAYLOAD_TYPE_TXT_MSG <span class="op">&amp;&amp;</span> len <span class="op">&gt;</span> <span class="dv">5</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">uint32_t</span> timestamp<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    memcpy<span class="op">(&amp;</span>timestamp<span class="op">,</span> data<span class="op">,</span> <span class="dv">4</span><span class="op">);</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">uint8_t</span> flags <span class="op">=</span> data<span class="op">[</span><span class="dv">4</span><span class="op">]</span> <span class="op">&gt;&gt;</span> <span class="dv">2</span><span class="op">;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">// len can be &gt; original length, but &#39;text&#39; will be padded with zeroes</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    data<span class="op">[</span>len<span class="op">]</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="co">// ← </span><span class="al">BUG</span><span class="co">: writes past end of data[] when len == MAX_PACKET_PAYLOAD</span></span></code></pre></div>
+<p><strong>Code (group text message):</strong></p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">// BaseChatMesh.cpp:372 — onGroupDataRecv()</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">uint32_t</span> timestamp<span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    memcpy<span class="op">(&amp;</span>timestamp<span class="op">,</span> data<span class="op">,</span> <span class="dv">4</span><span class="op">);</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">// len can be &gt; original length, but &#39;text&#39; will be padded with zeroes</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    data<span class="op">[</span>len<span class="op">]</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="co">// ← </span><span class="al">BUG</span><span class="co">: same out-of-bounds write</span></span></code></pre></div>
+<p><strong>Note:</strong> <code>data</code> is declared on the stack in
+<code>Mesh::onRecvPacket()</code> as:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="dt">uint8_t</span> data<span class="op">[</span>MAX_PACKET_PAYLOAD<span class="op">];</span> <span class="co">// 184 bytes</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> len <span class="op">=</span> Utils<span class="op">::</span>MACThenDecrypt<span class="op">(</span>secret<span class="op">,</span> data<span class="op">,</span> macAndData<span class="op">,</span> pkt<span class="op">-&gt;</span>payload_len <span class="op">-</span> i<span class="op">);</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">// len can be up to MAX_PACKET_PAYLOAD (184)</span></span></code></pre></div>
+<hr />
+<h3
+id="bug-4-high-packet-pool-exhaustion-causes-permanent-unresponsiveness">Bug
+#4 — HIGH: Packet Pool Exhaustion Causes Permanent Unresponsiveness</h3>
+<p><strong>File:</strong>
+<code>src/helpers/StaticPoolPacketManager.cpp</code>,
+<code>src/Dispatcher.cpp</code><br />
+<strong>Impact:</strong> Node becomes permanently deaf to all traffic;
+requires reboot to recover.</p>
+<p><strong>Worst-Case Outcome:</strong> Permanent deafness on any role.
+On <code>companion_radio</code> (16-slot pool): a BLE-paired phone app
+sending a burst of ~20 messages fills the pool before the radio can
+drain it. On repeater/room_server (32-slot pool): a TRACE/flood storm or
+a fast series of client logins can exhaust the pool. Once exhausted,
+<code>allocNew()</code> returns NULL for every incoming radio packet —
+the node is silently deaf to all mesh traffic. Only a reboot recovers.
+No external attacker needed — a legitimate client with poor connectivity
+retrying rapidly can trigger this.</p>
+<p><strong>Description:</strong><br />
+The packet pool is a fixed-size static allocation. Once all packets are
+in use (held in outbound queue, inbound queue, or via
+<code>ACTION_MANUAL_HOLD</code>), <code>allocNew()</code> returns
+<code>NULL</code> and all incoming radio packets are silently discarded.
+There is no mechanism to reclaim or forcibly free queued packets. A
+burst of flood or TRACE packets, combined with long retransmit delays,
+can fill the pool. Once full, the node cannot receive or process any new
+traffic until rebooted.</p>
+<p>The <code>ACTION_MANUAL_HOLD</code> path is particularly dangerous —
+if a sub-class holds a packet and never releases it (e.g. due to a logic
+error), that packet slot is permanently lost.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// StaticPoolPacketManager.cpp</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>mesh<span class="op">::</span>Packet<span class="op">*</span> StaticPoolPacketManager<span class="op">::</span>allocNew<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> unused<span class="op">.</span>removeByIdx<span class="op">(</span><span class="dv">0</span><span class="op">);</span>  <span class="co">// just get first one (returns NULL if empty)</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">// Dispatcher.cpp — checkRecv()</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>pkt <span class="op">=</span> _mgr<span class="op">-&gt;</span>allocNew<span class="op">();</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>pkt <span class="op">==</span> NULL<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    MESH_DEBUG_PRINTLN<span class="op">(</span><span class="st">&quot;WARNING: received data, no unused packets available!&quot;</span><span class="op">);</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ← pkt stays NULL, incoming radio data is simply dropped!</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">// Dispatcher.cpp — processRecvPacket()</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> Dispatcher<span class="op">::</span>processRecvPacket<span class="op">(</span>Packet<span class="op">*</span> pkt<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  DispatcherAction action <span class="op">=</span> onRecvPacket<span class="op">(</span>pkt<span class="op">);</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>action <span class="op">==</span> ACTION_RELEASE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    _mgr<span class="op">-&gt;</span>free<span class="op">(</span>pkt<span class="op">);</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>action <span class="op">==</span> ACTION_MANUAL_HOLD<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">// sub-class is wanting to manually hold Packet instance</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ← if sub-class never calls releasePacket(), this slot is LEAKED forever</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    _mgr<span class="op">-&gt;</span>queueOutbound<span class="op">(</span>pkt<span class="op">,</span> priority<span class="op">,</span> futureMillis<span class="op">(</span>_delay<span class="op">));</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h3 id="bug-5-high-aes-128-ecb-mode-leaks-plaintext-patterns">Bug #5 —
+HIGH: AES-128 ECB Mode Leaks Plaintext Patterns</h3>
+<p><strong>File:</strong> <code>src/Utils.cpp</code><br />
+<strong>Impact:</strong> Identical plaintext blocks produce identical
+ciphertext; enables pattern analysis and replay detection.</p>
+<p><strong>Worst-Case Outcome:</strong> Passive traffic analysis and
+replay injection on <strong>all encrypted messages</strong> (DMs,
+channel messages, CLI commands). Any LoRa SDR within radio range can
+capture packets and determine, <strong>without the key</strong>, that
+two messages are identical — because AES-ECB is deterministic. Group
+channel messages are especially exposed: all members share the same
+channel secret, so a common greeting from the same sender at the same
+timestamp produces byte-for-byte identical ciphertext. Attacker can also
+build a first-block codebook exploiting the known plaintext structure
+(<code>[timestamp(4)] [type(1)] [sender_name...]</code>) — identical
+first 16 bytes produce identical first ciphertext block, leaking sender
+identity and timing. Combined with Bug #16 (no replay protection),
+captured ciphertext packets can be retransmitted verbatim after the
+<code>hasSeen()</code> ring buffer cycles (~128 packets), and receivers
+will accept them as new valid messages. Does NOT enable direct
+decryption of unknown messages, but degrades encryption from IND-CPA
+(indistinguishable under chosen-plaintext) to a deterministic
+permutation — a fundamental cryptographic weakness. <strong>Partial
+mitigation available (non-breaking):</strong> replacing zero-padding
+with random-padding in the last ECB block (<code>memset(tmp,0,16)</code>
+-&gt; <code>random(tmp,16)</code> in <code>encrypt()</code>) makes short
+messages (&lt; 16 bytes plaintext, i.e. single-block) fully
+non-deterministic and randomizes the last block of all longer messages.
+This is backward-compatible — decryption ignores padding bytes. Full
+aligned blocks remain deterministic under ECB; a complete fix (AES-CTR
+with per-packet nonce) requires a future protocol version bump.</p>
+<p><strong>PoC:</strong> <code>bug5-aes-ecb.py</code><br />
+<strong>Patch:</strong> <code>bug5-aes-ecb.patch</code></p>
+<p><strong>Description:</strong><br />
+All encryption uses AES-128 in ECB (Electronic Codebook) mode — each
+16-byte block is encrypted independently with no chaining, no IV, and no
+nonce. This is a well-known insecure mode: - Identical plaintext blocks
+produce identical ciphertext blocks, leaking structural information. -
+The same message encrypted with the same key always produces the same
+ciphertext, enabling an observer to detect repeated messages. - Padding
+uses zero bytes, further reducing entropy in the last block.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Utils.cpp — encrypt()</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> Utils<span class="op">::</span>encrypt<span class="op">(</span><span class="at">const</span> <span class="dt">uint8_t</span><span class="op">*</span> shared_secret<span class="op">,</span> <span class="dt">uint8_t</span><span class="op">*</span> dest<span class="op">,</span> <span class="at">const</span> <span class="dt">uint8_t</span><span class="op">*</span> src<span class="op">,</span> <span class="dt">int</span> src_len<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  AES128 aes<span class="op">;</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">uint8_t</span><span class="op">*</span> dp <span class="op">=</span> dest<span class="op">;</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  aes<span class="op">.</span>setKey<span class="op">(</span>shared_secret<span class="op">,</span> CIPHER_KEY_SIZE<span class="op">);</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">while</span> <span class="op">(</span>src_len <span class="op">&gt;=</span> <span class="dv">16</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    aes<span class="op">.</span>encryptBlock<span class="op">(</span>dp<span class="op">,</span> src<span class="op">);</span>     <span class="co">// &lt;- ECB mode: each block encrypted independently</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    dp <span class="op">+=</span> <span class="dv">16</span><span class="op">;</span> src <span class="op">+=</span> <span class="dv">16</span><span class="op">;</span> src_len <span class="op">-=</span> <span class="dv">16</span><span class="op">;</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>src_len <span class="op">&gt;</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span>  <span class="co">// remaining partial block</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">uint8_t</span> tmp<span class="op">[</span><span class="dv">16</span><span class="op">];</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    memset<span class="op">(</span>tmp<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">16</span><span class="op">);</span>            <span class="co">// &lt;- zero-padding</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    memcpy<span class="op">(</span>tmp<span class="op">,</span> src<span class="op">,</span> src_len<span class="op">);</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    aes<span class="op">.</span>encryptBlock<span class="op">(</span>dp<span class="op">,</span> tmp<span class="op">);</span>     <span class="co">// &lt;- no IV, no chaining</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    dp <span class="op">+=</span> <span class="dv">16</span><span class="op">;</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> dp <span class="op">-</span> dest<span class="op">;</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Severity Review:</strong> Keeping <strong>HIGH</strong>. ECB
+mode is a fundamental cryptographic weakness that affects every
+encrypted packet in the protocol. It does not directly expose plaintext
+(the AES key is still required), but it violates the basic expectation
+of semantic security (IND-CPA). The practical exploitation path —
+passive SDR traffic analysis + codebook construction + replay — is
+realistic for a motivated attacker near the mesh. However, it requires
+radio proximity and does not yield plaintext directly, which is why it
+stays HIGH rather than CRITICAL.</p>
+<hr />
+<h3 id="bug-6-high-denial-of-service-via-trace-packet-flood">Bug #6 —
+HIGH: Denial-of-Service via TRACE Packet Flood</h3>
+<p><strong>File:</strong> <code>src/Mesh.cpp</code><br />
+<strong>Impact:</strong> Remote attacker can drain TX budget and fill
+packet queue of any target node.</p>
+<p><strong>Worst-Case Outcome:</strong> Sustained denial-of-service on
+<strong>repeaters</strong> and <strong>room servers</strong> (any
+firmware with <code>allowPacketForward()</code> returning true).
+<strong>Unauthenticated</strong> — TRACE packets carry no signature or
+encryption, so any LoRa radio (cheap module, SDR, or modified firmware)
+within radio range can execute this attack. The attacker sends a
+continuous stream of TRACEs, each with a unique <code>trace_tag</code>
+(bypassing the 128-entry <code>hasSeen()</code> dedup table) and the
+target’s 1-byte path hash (only 256 possibilities, trivially guessable
+or known from public key). Each matching TRACE is queued for retransmit,
+consuming 1 of 32 pool slots and burning TX airtime budget. At ~10
+TRACEs/sec, the pool is exhausted in ~3 seconds; the TX budget drops to
+0, pushing <code>next_tx_time</code> indefinitely into the future.
+Result: the repeater becomes <strong>deaf</strong> (pool full → can’t
+allocate for RX) and <strong>mute</strong> (no TX budget → can’t send).
+Normal mesh traffic is completely blocked for the duration of the flood.
+<strong>This is NOT a permanent hang</strong> — once the attacker stops
+transmitting, queued TRACEs drain via TX or <code>outbound_expiry</code>
+timeout (seconds), the pool refills, and <code>updateTxBudget()</code>
+restores the TX budget proportionally to elapsed idle time. The node
+self-recovers without reboot. The damage is availability-during-attack
+only, unlike Bugs #22/#9/#4 which cause permanent hangs. Multi-hop TRACE
+paths amplify through intermediate repeaters, allowing a single attacker
+to disrupt an entire chain. Companion radio nodes are unaffected
+(<code>allowPacketForward()</code> returns false).</p>
+<p><strong>Description:</strong><br />
+TRACE packets use direct routing and bypass the flood deduplication. The
+TRACE handler forwards the packet if the current node’s hash matches a
+byte in the payload path — and since <code>PATH_HASH_SIZE</code> is 1
+byte, this is easy to target. The forwarding allocates a priority-5
+outbound slot and consumes TX airtime budget. An attacker can generate a
+continuous stream of unique TRACE packets (each with a different
+<code>trace_tag</code>), all targeting a specific node’s 1-byte hash,
+to: 1. Fill the outbound packet queue 2. Drain the TX duty-cycle budget
+3. Exhaust the packet pool</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Mesh.cpp — onRecvPacket(), TRACE handler</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>pkt<span class="op">-&gt;</span>isRouteDirect<span class="op">()</span> <span class="op">&amp;&amp;</span> pkt<span class="op">-&gt;</span>getPayloadType<span class="op">()</span> <span class="op">==</span> PAYLOAD_TYPE_TRACE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>pkt<span class="op">-&gt;</span>path_len <span class="op">&lt;</span> MAX_PATH_SIZE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      <span class="co">// ...</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> flags <span class="op">=</span> pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">++];</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> path_sz <span class="op">=</span> flags <span class="op">&amp;</span> <span class="bn">0x03</span><span class="op">;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> len <span class="op">=</span> pkt<span class="op">-&gt;</span>payload_len <span class="op">-</span> i<span class="op">;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> offset <span class="op">=</span> pkt<span class="op">-&gt;</span>path_len <span class="op">&lt;&lt;</span> path_sz<span class="op">;</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> <span class="op">(</span>offset <span class="op">&gt;=</span> len<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        onTraceRecv<span class="op">(</span>pkt<span class="op">,</span> trace_tag<span class="op">,</span> auth_code<span class="op">,</span> flags<span class="op">,</span> pkt<span class="op">-&gt;</span>path<span class="op">,</span> <span class="op">&amp;</span>pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">],</span> len<span class="op">);</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>      <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>self_id<span class="op">.</span>isHashMatch<span class="op">(&amp;</span>pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i <span class="op">+</span> offset<span class="op">],</span> <span class="dv">1</span> <span class="op">&lt;&lt;</span> path_sz<span class="op">)</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                 <span class="op">&amp;&amp;</span> allowPacketForward<span class="op">(</span>pkt<span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">!</span>_tables<span class="op">-&gt;</span>hasSeen<span class="op">(</span>pkt<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>        pkt<span class="op">-&gt;</span>path<span class="op">[</span>pkt<span class="op">-&gt;</span>path_len<span class="op">++]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">int8_t</span><span class="op">)</span> <span class="op">(</span>pkt<span class="op">-&gt;</span>getSNR<span class="op">()*</span><span class="dv">4</span><span class="op">);</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="dt">uint32_t</span> d <span class="op">=</span> getDirectRetransmitDelay<span class="op">(</span>pkt<span class="op">);</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> ACTION_RETRANSMIT_DELAYED<span class="op">(</span><span class="dv">5</span><span class="op">,</span> d<span class="op">);</span> <span class="co">// ← queued for retransmit, consuming pool + TX budget</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>      <span class="op">}</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ACTION_RELEASE<span class="op">;</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h3 id="bug-7-high-unbounded-sprintf-buffer-overflow-in-cli-handler">Bug
+#7 — HIGH: Unbounded <code>sprintf</code> Buffer Overflow in CLI
+Handler</h3>
+<p><strong>File:</strong> <code>src/helpers/CommonCLI.cpp</code><br />
+<strong>Impact:</strong> Stack buffer overflow if an attacker sends a
+long CLI command; can corrupt memory or crash the device.</p>
+<p><strong>Worst-Case Outcome:</strong> Crash/reboot or potential code
+execution on repeater, room server, or sensor nodes. <strong>Remote
+attack (BLE/radio):</strong> An admin-authenticated client sends a
+179-byte CLI command like <code>set AAAA...</code> (175-byte config).
+The firmware writes <code>"unknown config: "</code> (16 bytes) + 175
+bytes = 191 bytes into a 161-byte <code>reply[]</code> buffer →
+<strong>30-byte stack overflow</strong>. On ARM Cortex-M4 (nRF52) this
+overwrites saved r4-r7 and the return address (LR) → HardFault or
+attacker-controlled PC. <strong>Serial attack:</strong> 155-byte config
+→ 171 bytes into 160-byte buffer → 11-byte overflow. The
+<code>get owner.info</code> path writes up to 122 bytes char-by-char
+with zero bounds checking. All three firmware variants (repeater, room
+server, sensor) are affected.</p>
+<p><strong>Description:</strong><br />
+Multiple <code>handleCommand</code> / <code>handleSetCmd</code> code
+paths write attacker-controlled string data into the <code>reply</code>
+buffer using <code>sprintf</code> without any length check. The
+<code>reply</code> buffer is typically a fixed-size stack array in the
+calling firmware (often 160–256 bytes). A crafted long command string
+can overflow this buffer.</p>
+<p><strong>Code (unknown config echo):</strong></p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:729 — handleSetCmd()</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    sprintf<span class="op">(</span>reply<span class="op">,</span> <span class="st">&quot;unknown config: </span><span class="sc">%s</span><span class="st">&quot;</span><span class="op">,</span> config<span class="op">);</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ← &#39;config&#39; is attacker-controlled, no length limit</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span></code></pre></div>
+<p><strong>Code (password echo):</strong></p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:288 — handleCommand()</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>memcmp<span class="op">(</span>command<span class="op">,</span> <span class="st">&quot;password &quot;</span><span class="op">,</span> <span class="dv">9</span><span class="op">)</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>      StrHelper<span class="op">::</span>strncpy<span class="op">(</span>_prefs<span class="op">-&gt;</span>password<span class="op">,</span> <span class="op">&amp;</span>command<span class="op">[</span><span class="dv">9</span><span class="op">],</span> <span class="kw">sizeof</span><span class="op">(</span>_prefs<span class="op">-&gt;</span>password<span class="op">));</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      savePrefs<span class="op">();</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      sprintf<span class="op">(</span>reply<span class="op">,</span> <span class="st">&quot;password now: </span><span class="sc">%s</span><span class="st">&quot;</span><span class="op">,</span> _prefs<span class="op">-&gt;</span>password<span class="op">);</span></span></code></pre></div>
+<p><strong>Code (owner.info — char-by-char write without
+bounds):</strong></p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:787 — handleGetCmd()</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>memcmp<span class="op">(</span>config<span class="op">,</span> <span class="st">&quot;owner.info&quot;</span><span class="op">,</span> <span class="dv">10</span><span class="op">)</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>reply<span class="op">++</span> <span class="op">=</span> <span class="ch">&#39;&gt;&#39;</span><span class="op">;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>reply<span class="op">++</span> <span class="op">=</span> <span class="ch">&#39; &#39;</span><span class="op">;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">const</span> <span class="dt">char</span><span class="op">*</span> sp <span class="op">=</span> _prefs<span class="op">-&gt;</span>owner_info<span class="op">;</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="op">(*</span>sp<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>      <span class="op">*</span>reply<span class="op">++</span> <span class="op">=</span> <span class="op">(*</span>sp <span class="op">==</span> <span class="ch">&#39;</span><span class="sc">\n</span><span class="ch">&#39;</span><span class="op">)</span> <span class="op">?</span> <span class="ch">&#39;|&#39;</span> <span class="op">:</span> <span class="op">*</span>sp<span class="op">;</span>  <span class="co">// ← no check on reply buffer end</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>      sp<span class="op">++;</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>reply <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span></code></pre></div>
+<hr />
+<h3 id="bug-8-medium-race-condition-on-global-radio-state-variable">Bug
+#8 — MEDIUM: Race Condition on Global Radio State Variable</h3>
+<p><strong>File:</strong>
+<code>src/helpers/radiolib/RadioLibWrappers.cpp</code><br />
+<strong>Impact:</strong> Missed packets or radio state desync on
+interrupt timing edge cases.</p>
+<p><strong>Worst-Case Outcome:</strong> Single lost radio packet
+(self-recovering). In <code>recvRaw()</code>, the ISR can set
+<code>STATE_INT_READY</code> in the ~20μs window between
+<code>state = STATE_IDLE</code> and <code>state = STATE_RX</code>; the
+latter clobbers the flag, losing one received packet. The race window is
+orders of magnitude smaller than LoRa demodulation time (≥10ms at SF7),
+making occurrence probability vanishingly low. Not externally
+triggerable. System self-recovers on the next incoming packet.</p>
+<p><strong>PoC:</strong> No PoC can be written. The race window (~20μs
+between two assignments in <code>recvRaw()</code>) is 500× shorter than
+the fastest LoRa packet demodulation time (~10ms at SF7). There is no
+meshcore_py API or external radio stimulus that can control ARM hardware
+interrupt timing at the instruction level. The bug is proven by code
+analysis only.</p>
+<p><strong>Severity Review:</strong> MEDIUM — kept. The race is real but
+the window is effectively impossible to hit: LoRa demodulation takes
+≥10ms, the vulnerable window is ~20μs, and the consequence (one lost
+packet) is indistinguishable from normal RF packet loss. No permanent
+state corruption, no hang, no security impact. Self-recovers on next
+packet. The fix is a defensive-correctness improvement, not an urgent
+operational fix.</p>
+<p><strong>Description:</strong><br />
+The global <code>volatile uint8_t state</code> variable is written from
+the ISR (<code>setFlag()</code> — called on packet received or TX
+complete interrupt) and read/written from the main loop
+(<code>recvRaw()</code>, <code>isSendComplete()</code>,
+<code>startSendRaw()</code>). While <code>volatile</code> prevents
+compiler optimization, it does not provide atomicity on the
+read-check-write patterns in the main loop. On ARM Cortex-M (ESP32,
+nRF52), an interrupt can fire between a read and a write, causing TOCTOU
+races.</p>
+<p><strong>Race analysis — all <code>state</code> writers in the main
+loop:</strong></p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 18%" />
+<col style="width: 27%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Function</th>
+<th>Pattern</th>
+<th>Race window</th>
+<th>Practical risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>recvRaw()</code></td>
+<td><code>state = STATE_IDLE</code> then
+<code>state = STATE_RX</code></td>
+<td>~20μs (includes <code>startReceive()</code> SPI call)</td>
+<td><strong>Primary risk.</strong> ISR sets <code>INT_READY</code>
+between the two assignments; <code>state = STATE_RX</code> clobbers it.
+One RX packet lost.</td>
+</tr>
+<tr>
+<td><code>isSendComplete()</code></td>
+<td>Check <code>INT_READY</code>, then
+<code>state = STATE_IDLE</code></td>
+<td>&lt;1μs</td>
+<td><strong>No practical risk.</strong> During TX, only the TX-complete
+ISR fires; no second ISR can occur in this window.</td>
+</tr>
+<tr>
+<td><code>startSendRaw()</code></td>
+<td><code>state = STATE_TX_WAIT</code></td>
+<td>&lt;1μs</td>
+<td><strong>No practical risk.</strong> Radio is being switched from
+IDLE to TX; no ISR pending.</td>
+</tr>
+<tr>
+<td><code>onSendFinished()</code></td>
+<td><code>state = STATE_IDLE</code></td>
+<td>&lt;1μs</td>
+<td><strong>No practical risk.</strong> Called immediately after
+<code>isSendComplete()</code> returns true; no new ISR expected.</td>
+</tr>
+<tr>
+<td><code>idle()</code> / <code>resetAGC()</code> /
+<code>startRecv()</code></td>
+<td><code>state = STATE_IDLE</code> or <code>STATE_RX</code></td>
+<td>&lt;1μs</td>
+<td><strong>Minimal risk.</strong> Called during initialization or
+calibration, not in hot receive path.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The primary race in <code>recvRaw()</code>
+step-by-step:</strong></p>
+<pre><code>Main loop:
+  [A] if (state &amp; STATE_INT_READY)    → true (RX complete ISR fired)
+  [B] readData() from radio FIFO      (SPI: ~50-200μs)
+  [C] state = STATE_IDLE              → clears INT_READY + base state
+  ------- ISR fires here: state |= STATE_INT_READY → state = 0x10 -------
+  [D] if (state != STATE_RX)          → true (0x10 != 0x01)
+  [E] startReceive()                  (SPI: ~10-50μs, puts radio in RX)
+  [F] state = STATE_RX                → state = 0x01, CLOBBERS STATE_INT_READY
+      → Packet that caused the ISR between [C] and [F] is LOST</code></pre>
+<p><strong>Why it’s practically untriggerable:</strong> For the ISR to
+fire between [C] and [F], a second packet must have completed full LoRa
+demodulation in that window. Even at the fastest setting (SF7/500kHz), a
+minimum-size packet takes ~5ms to demodulate. The [C]-to-[F] window is
+~20μs. The radio’s continuous-RX mode can overlap demodulation of a new
+packet with main-loop processing, but the new packet’s ISR won’t fire
+until demodulation completes — which takes far longer than the race
+window.</p>
+<p><strong>Code (current — vulnerable):</strong></p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="at">static</span> <span class="at">volatile</span> <span class="dt">uint8_t</span> state <span class="op">=</span> STATE_IDLE<span class="op">;</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="at">static</span> <span class="dt">void</span> setFlag<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  state <span class="op">|=</span> STATE_INT_READY<span class="op">;</span>  <span class="co">// ISR: read-modify-write (safe — ISR can&#39;t be preempted by main loop)</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> RadioLibWrapper<span class="op">::</span>recvRaw<span class="op">(</span><span class="dt">uint8_t</span><span class="op">*</span> bytes<span class="op">,</span> <span class="dt">int</span> sz<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> len <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>state <span class="op">&amp;</span> STATE_INT_READY<span class="op">)</span> <span class="op">{</span>         <span class="co">// check flag</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    len <span class="op">=</span> _radio<span class="op">-&gt;</span>getPacketLength<span class="op">();</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ... read data ...</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    state <span class="op">=</span> STATE_IDLE<span class="op">;</span>                  <span class="co">// [C] clear flag — ISR can fire after this</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>state <span class="op">!=</span> STATE_RX<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> err <span class="op">=</span> _radio<span class="op">-&gt;</span>startReceive<span class="op">();</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>err <span class="op">==</span> RADIOLIB_ERR_NONE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>      state <span class="op">=</span> STATE_RX<span class="op">;</span>                  <span class="co">// [F] CLOBBERS any INT_READY set since [C]</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> len<span class="op">;</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Fix:</strong> See <code>bug8-isr-race.patch</code> — wraps
+all main-loop reads and writes of <code>state</code> in
+<code>noInterrupts()</code> / <code>interrupts()</code> critical
+sections. Key changes: 1. <code>recvRaw()</code>: Atomically
+snapshot+clear <code>INT_READY</code> at the start; after
+<code>startReceive()</code>, only set <code>STATE_RX</code> if no new
+<code>INT_READY</code> arrived during the SPI call. 2.
+<code>isSendComplete()</code>: Atomically test-and-clear
+<code>INT_READY</code>. 3. All other writers (<code>idle()</code>,
+<code>startRecv()</code>, <code>resetAGC()</code>,
+<code>startSendRaw()</code>, <code>onSendFinished()</code>): Wrap
+<code>state</code> writes in critical sections for consistency. 4. All
+readers (<code>isInRecvMode()</code>, <code>loop()</code>): Snapshot
+<code>state</code> under <code>noInterrupts()</code> to prevent torn
+reads.</p>
+<hr />
+<h3 id="bug-9-high-radio-stuck-detection-with-no-recovery">Bug #9 —
+HIGH: Radio Stuck Detection With No Recovery</h3>
+<p><strong>File:</strong> <code>src/Dispatcher.cpp</code><br />
+<strong>Impact:</strong> If the radio gets stuck in non-RX mode, the
+device becomes permanently deaf without reboot.</p>
+<p><strong>Worst-Case Outcome:</strong> Permanent deaf node requiring
+reboot — all roles (repeater, room server, sensor, companion). This bug
+is the <strong>defense-in-depth failure</strong> that makes Bug #22
+fatal: when <code>acl.save()</code> corrupts the SPI bus on nRF52, the
+SX1262 radio gets stuck in a non-RX state. The 8-second timeout fires,
+sets <code>ERR_EVENT_STARTRX_TIMEOUT</code>, but takes <strong>no
+recovery action</strong> — no radio reset, no AGC cycle, no reboot. The
+radio stays stuck permanently. Even without Bug #22, any hardware
+glitch, power brownout, or SPI noise that leaves the radio in IDLE or TX
+state will be permanently fatal. The node appears online (BLE still
+works, serial still responds) but never receives a radio packet
+again.</p>
+<p><strong>Description:</strong><br />
+The dispatcher checks if the radio has been outside RX mode for more
+than 8 seconds and sets an error flag. However, this flag is never acted
+upon — no attempt is made to reset the radio, force it back into RX
+mode, or reboot. The flag is only cleared by a manual
+<code>resetStats()</code> call. If the radio genuinely gets stuck
+(e.g. after a failed TX or a hardware glitch), the device silently stops
+receiving packets forever.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Dispatcher.cpp — loop()</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> is_recv <span class="op">=</span> _radio<span class="op">-&gt;</span>isInRecvMode<span class="op">();</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>is_recv <span class="op">!=</span> prev_isrecv_mode<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    prev_isrecv_mode <span class="op">=</span> is_recv<span class="op">;</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>is_recv<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>      radio_nonrx_start <span class="op">=</span> _ms<span class="op">-&gt;</span>getMillis<span class="op">();</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(!</span>is_recv <span class="op">&amp;&amp;</span> _ms<span class="op">-&gt;</span>getMillis<span class="op">()</span> <span class="op">-</span> radio_nonrx_start <span class="op">&gt;</span> <span class="dv">8000</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    _err_flags <span class="op">|=</span> ERR_EVENT_STARTRX_TIMEOUT<span class="op">;</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ← That&#39;s it. No recovery action. Radio stays stuck.</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span></code></pre></div>
+<hr />
+<h3 id="bug-10-medium-advertdataparser-reads-past-buffer">Bug #10 —
+MEDIUM: <code>AdvertDataParser</code> Reads Past Buffer</h3>
+<p><strong>File:</strong>
+<code>src/helpers/AdvertDataHelpers.cpp</code><br />
+<strong>Impact:</strong> Out-of-bounds read on crafted short
+advertisement packets; may read adjacent stack/heap data.</p>
+<p><strong>Worst-Case Outcome:</strong> Crash/reboot on any node (all
+roles) that processes a malformed advertisement. A compromised or rogue
+enrolled node broadcasts an advert with <code>app_data_len=1</code> and
+<code>flags=0x70</code> (all field flags set). The parser immediately
+performs 4 <code>memcpy()</code> calls reading 12 bytes past the 1-byte
+buffer — into adjacent stack/heap memory. On ESP32 this may cross into
+flash-mapped IRAM → <code>LoadProhibited</code> exception → reboot. On
+nRF52 it may cross an MPU boundary → HardFault → reboot. The attack
+requires a valid ed25519 signature (attacker must own a key pair = be an
+enrolled node), but hits <strong>every receiver in radio range</strong>
+simultaneously. The read data doesn’t leak back to the attacker (no info
+disclosure), but the crash is the goal.</p>
+<p><strong>Description:</strong><br />
+The <code>AdvertDataParser</code> constructor checks if flags indicate
+the presence of lat/lon (8 bytes) and feature fields (2 bytes each) and
+reads them from <code>app_data</code> using <code>memcpy</code>. The
+bounds check (<code>app_data_len &gt;= i</code>) only happens
+<em>after</em> all the reads. A crafted short payload with flags
+claiming lat/lon and features but providing only a few bytes will cause
+<code>memcpy</code> to read past the end of the <code>app_data</code>
+buffer.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">// AdvertDataHelpers.cpp — AdvertDataParser constructor</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  AdvertDataParser<span class="op">::</span>AdvertDataParser<span class="op">(</span><span class="at">const</span> <span class="dt">uint8_t</span> app_data<span class="op">[],</span> <span class="dt">uint8_t</span> app_data_len<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    _flags <span class="op">=</span> app_data<span class="op">[</span><span class="dv">0</span><span class="op">];</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    _valid <span class="op">=</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>_flags <span class="op">&amp;</span> ADV_LATLON_MASK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>      memcpy<span class="op">(&amp;</span>_lat<span class="op">,</span> <span class="op">&amp;</span>app_data<span class="op">[</span>i<span class="op">],</span> <span class="dv">4</span><span class="op">);</span> i <span class="op">+=</span> <span class="dv">4</span><span class="op">;</span>  <span class="co">// ← reads 4 bytes, no check on app_data_len</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>      memcpy<span class="op">(&amp;</span>_lon<span class="op">,</span> <span class="op">&amp;</span>app_data<span class="op">[</span>i<span class="op">],</span> <span class="dv">4</span><span class="op">);</span> i <span class="op">+=</span> <span class="dv">4</span><span class="op">;</span>  <span class="co">// ← reads another 4 bytes</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>_flags <span class="op">&amp;</span> ADV_FEAT1_MASK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>      memcpy<span class="op">(&amp;</span>_extra1<span class="op">,</span> <span class="op">&amp;</span>app_data<span class="op">[</span>i<span class="op">],</span> <span class="dv">2</span><span class="op">);</span> i <span class="op">+=</span> <span class="dv">2</span><span class="op">;</span>  <span class="co">// ← no bounds check yet</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>_flags <span class="op">&amp;</span> ADV_FEAT2_MASK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>      memcpy<span class="op">(&amp;</span>_extra2<span class="op">,</span> <span class="op">&amp;</span>app_data<span class="op">[</span>i<span class="op">],</span> <span class="dv">2</span><span class="op">);</span> i <span class="op">+=</span> <span class="dv">2</span><span class="op">;</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>app_data_len <span class="op">&gt;=</span> i<span class="op">)</span> <span class="op">{</span>  <span class="co">// ← bounds check happens HERE, too late!</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>      <span class="co">// ... parse name ...</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>      _valid <span class="op">=</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span></code></pre></div>
+<hr />
+<h3 id="bug-11-medium-trace-path-offset-overflow-causes-oob-read">Bug
+#11 — MEDIUM: TRACE Path Offset Overflow Causes OOB Read</h3>
+<p><strong>File:</strong> <code>src/Mesh.cpp</code><br />
+<strong>Impact:</strong> Out-of-bounds read in payload array from
+crafted TRACE packets; may crash or leak memory.</p>
+<p><strong>Worst-Case Outcome:</strong> Crash/reboot or unintended
+packet forwarding on any node (all roles).
+<strong>Unauthenticated</strong> — TRACE packets require no signature or
+encryption, so any SDR or modified firmware within radio range can
+trigger this. The attacker crafts a TRACE with <code>path_len=32</code>
+and <code>flags=0x03</code> (path_sz=3). The firmware computes
+<code>offset = 32 &lt;&lt; 3 = 256</code>, which truncates to
+<code>uint8_t</code> 0. This causes the wrong branch (forward instead of
+“end of path”), and <code>isHashMatch()</code> reads 8 bytes from
+<code>payload[9]</code> — which may be past the actual payload end. On
+nRF52 → HardFault → reboot. On ESP32 → <code>LoadProhibited</code> →
+reboot. If the OOB bytes happen to match the node’s pub_key prefix
+(1/256 chance for 1-byte hash), the node incorrectly forwards the TRACE,
+amplifying the attack. Continuous broadcast of malformed TRACEs =
+low-cost wide-area DoS against every node in radio range.</p>
+<p><strong>Description:</strong><br />
+In the TRACE packet handler, <code>offset</code> is calculated as
+<code>pkt-&gt;path_len &lt;&lt; path_sz</code> where
+<code>path_sz</code> comes from attacker-controlled flags (bits 0–1, so
+0–3). If <code>path_len</code> is, say, 60 and <code>path_sz</code> is
+3, then <code>60 &lt;&lt; 3 = 480</code>, which overflows the
+<code>uint8_t offset</code> variable (wraps to 480 &amp; 0xFF = 224).
+The subsequent <code>pkt-&gt;payload[i + offset]</code> can then read
+past the 184-byte payload buffer.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Mesh.cpp — TRACE handler</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> flags <span class="op">=</span> pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">++];</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> path_sz <span class="op">=</span> flags <span class="op">&amp;</span> <span class="bn">0x03</span><span class="op">;</span>  <span class="co">// ← attacker-controlled: 0..3</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> len <span class="op">=</span> pkt<span class="op">-&gt;</span>payload_len <span class="op">-</span> i<span class="op">;</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> offset <span class="op">=</span> pkt<span class="op">-&gt;</span>path_len <span class="op">&lt;&lt;</span> path_sz<span class="op">;</span>  <span class="co">// ← overflow! e.g. 60 &lt;&lt; 3 = 480 → truncated to 224</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> <span class="op">(</span>offset <span class="op">&gt;=</span> len<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        onTraceRecv<span class="op">(</span>pkt<span class="op">,</span> trace_tag<span class="op">,</span> auth_code<span class="op">,</span> flags<span class="op">,</span> pkt<span class="op">-&gt;</span>path<span class="op">,</span> <span class="op">&amp;</span>pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">],</span> len<span class="op">);</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>      <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>self_id<span class="op">.</span>isHashMatch<span class="op">(&amp;</span>pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i <span class="op">+</span> offset<span class="op">],</span> <span class="dv">1</span> <span class="op">&lt;&lt;</span> path_sz<span class="op">)</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>                 <span class="co">// ← i + offset can exceed payload_len</span></span></code></pre></div>
+<hr />
+<h3 id="bug-12-low-packetqueue-has-no-destructor-memory-leak">Bug #12 —
+LOW: <code>PacketQueue</code> Has No Destructor (Memory Leak)</h3>
+<p><strong>File:</strong>
+<code>src/helpers/StaticPoolPacketManager.h</code><br />
+<strong>Impact:</strong> If the packet manager is ever
+destroyed/recreated, all dynamically allocated queue memory leaks
+permanently.</p>
+<p><strong>Worst-Case Outcome:</strong> On current embedded firmware:
+<strong>no direct impact</strong> — <code>StaticPoolPacketManager</code>
+is created once at startup and never destroyed. However: (1) Unit tests
+or CI builds using ASAN/Valgrind will flag ~11 KB of leaked memory per
+<code>StaticPoolPacketManager(32)</code> destruction (3 queue arrays ×
+9×32 = 864 bytes + 32 Packet objects × ~258 bytes = ~9.1 KB), masking
+real bugs in leak reports. (2) The <code>PacketManager</code> base class
+(<code>Dispatcher.h</code>) lacks a <code>virtual</code> destructor, so
+<code>delete</code> via a <code>PacketManager*</code> pointer is
+<strong>undefined behavior</strong> in C++ — the derived destructor (if
+added) would never be called. (3) Any future runtime reconfiguration
+(changing pool size, hot-restart) would leak all pool memory on each
+cycle. All roles affected equally (repeater, room server, sensor,
+companion).</p>
+<p><strong>Description:</strong><br />
+<code>PacketQueue</code> allocates three arrays with <code>new[]</code>
+in its constructor but has no destructor to free them. While on embedded
+devices this is typically a one-time allocation, any reconfiguration or
+test scenario that recreates the manager will permanently leak
+memory.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co">// StaticPoolPacketManager.cpp</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>PacketQueue<span class="op">::</span>PacketQueue<span class="op">(</span><span class="dt">int</span> max_entries<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  _table <span class="op">=</span> <span class="kw">new</span> mesh<span class="op">::</span>Packet<span class="op">*[</span>max_entries<span class="op">];</span>      <span class="co">// ← allocated</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  _pri_table <span class="op">=</span> <span class="kw">new</span> <span class="dt">uint8_t</span><span class="op">[</span>max_entries<span class="op">];</span>         <span class="co">// ← allocated</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  _schedule_table <span class="op">=</span> <span class="kw">new</span> <span class="dt">uint32_t</span><span class="op">[</span>max_entries<span class="op">];</span>   <span class="co">// ← allocated</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  _size <span class="op">=</span> max_entries<span class="op">;</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  _num <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="co">// ← No destructor defined anywhere — no delete[]</span></span></code></pre></div>
+<hr />
+<h3
+id="bug-13-low-simplemeshtablesrestorefrom-loads-indexes-without-validation">Bug
+#13 — LOW: <code>SimpleMeshTables::restoreFrom</code> Loads Indexes
+Without Validation</h3>
+<p><strong>File:</strong>
+<code>src/helpers/SimpleMeshTables.h</code><br />
+<strong>Impact:</strong> Corrupted file causes out-of-bounds write on
+next <code>hasSeen()</code> call; memory corruption / crash.</p>
+<p><strong>Worst-Case Outcome:</strong> <strong>Latent OOB write on
+ESP32</strong> — currently no firmware variant calls
+<code>restoreFrom()</code>, so this bug cannot be triggered today.
+However, <code>restoreFrom()</code> is a public method compiled on ESP32
+(behind <code>#ifdef ESP32</code>). If table persistence is added in the
+future, a corrupted flash file (from wear, power loss during write, or
+bit-flip) would load <code>_next_idx</code> &gt; 128, and the next
+<code>hasSeen()</code> call writes 8 bytes at offset
+<code>_next_idx * 8</code> past the start of <code>_hashes[]</code> — up
+to ~7 KB beyond the array. This corrupts heap metadata or adjacent
+globals, causing an immediate crash or silent data corruption. Worse,
+because the corrupted file is read on every boot, this becomes a
+<strong>crash loop</strong> — the device reboots, loads the corrupt
+file, crashes, reboots — until the flash file is manually erased via
+serial or full reflash.</p>
+<p><strong>Description:</strong><br />
+<code>restoreFrom()</code> reads <code>_next_idx</code> and
+<code>_next_ack_idx</code> from a file without validating they are
+within bounds. If the file is corrupted (flash wear, incomplete write),
+<code>_next_idx</code> could be &gt; <code>MAX_PACKET_HASHES</code>,
+causing <code>_hashes[_next_idx * MAX_HASH_SIZE]</code> to write outside
+the array on the next <code>hasSeen()</code> call.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">// SimpleMeshTables.h</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> restoreFrom<span class="op">(</span>File f<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    f<span class="op">.</span>read<span class="op">(</span>_hashes<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>_hashes<span class="op">));</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    f<span class="op">.</span>read<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)</span> <span class="op">&amp;</span>_next_idx<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>_next_idx<span class="op">));</span>       <span class="co">// ← no bounds check!</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    f<span class="op">.</span>read<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)</span> <span class="op">&amp;</span>_acks<span class="op">[</span><span class="dv">0</span><span class="op">],</span> <span class="kw">sizeof</span><span class="op">(</span>_acks<span class="op">));</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    f<span class="op">.</span>read<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)</span> <span class="op">&amp;</span>_next_ack_idx<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>_next_ack_idx<span class="op">));</span> <span class="co">// ← no bounds check!</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="co">// Later in hasSeen():</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    memcpy<span class="op">(&amp;</span>_hashes<span class="op">[</span>_next_idx <span class="op">*</span> MAX_HASH_SIZE<span class="op">],</span> hash<span class="op">,</span> MAX_HASH_SIZE<span class="op">);</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    _next_idx <span class="op">=</span> <span class="op">(</span>_next_idx <span class="op">+</span> <span class="dv">1</span><span class="op">)</span> <span class="op">%</span> MAX_PACKET_HASHES<span class="op">;</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ← if _next_idx was 999, _hashes[999*8] writes WAY past array end</span></span></code></pre></div>
+<hr />
+<h3 id="bug-14-medium-group-channel-hash-uses-only-1-byte">Bug #14 —
+MEDIUM: Group Channel Hash Uses Only 1 Byte</h3>
+<p><strong>File:</strong> <code>src/MeshCore.h</code>,
+<code>src/Mesh.h</code>, <code>src/Mesh.cpp</code>,
+<code>src/helpers/BaseChatMesh.cpp</code><br />
+<strong>Impact:</strong> High collision rate between channels;
+brute-force message injection feasible in ~109 minutes.</p>
+<p><strong>Worst-Case Outcome:</strong> <strong>Garbage message
+injection to any group channel</strong> — unauthenticated, any LoRa SDR
+or modified firmware in radio range. The group message packet format
+uses only 1 byte of SHA-256 for channel identification
+(<code>PATH_HASH_SIZE = 1</code> in <code>MeshCore.h</code>). With 256
+possible hash values, a node with 40 channels has a 96% chance of at
+least one collision pair (birthday problem). An attacker who knows or
+guesses the target channel’s hash byte (1/256 blind, or trivially
+enumerable) needs only brute-force the 2-byte HMAC
+(<code>CIPHER_MAC_SIZE = 2</code>, 65,536 possibilities). At ~10 LoRa
+packets/sec, near-certain MAC collision in ~109 minutes. The
+successfully “injected” message decrypts to random garbage (attacker
+lacks the AES key), but <code>MACThenDecrypt</code> returns success and
+<code>onGroupDataRecv</code> processes it — displaying a corrupted
+message from a random “sender” (first 5 bytes parsed as sender ID +
+timestamp). Secondary impact: <strong>CPU waste DoS</strong> — flooding
+all 256 hash byte values forces the target to attempt HMAC-SHA256 +
+AES-128 decryption for every locally matching channel per packet. With
+40 channels, a 256-packet burst triggers 40 full crypto operations. This
+is a <strong>protocol-level design weakness</strong> — the fix requires
+increasing the channel hash size (breaking backward compatibility with
+older firmware).</p>
+<p><strong>Description:</strong><br />
+The <code>searchChannelsByHash</code> function compares only the first
+byte of the channel hash. With 256 possible values, roughly 1 in 256
+channels will match any incoming group packet’s hash byte. The only
+remaining authentication is the 2-byte HMAC, which can be brute-forced
+in ~65,536 attempts.</p>
+<p>The root constant is <code>PATH_HASH_SIZE = 1</code> in
+<code>MeshCore.h</code>, which controls both
+<code>GroupChannel::hash[]</code> storage and the number of hash bytes
+written into group message packets. The hash is the first byte of
+SHA-256(channel_secret).</p>
+<p><strong>Code (channel lookup — 1-byte comparison):</strong></p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">// BaseChatMesh.cpp</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> BaseChatMesh<span class="op">::</span>searchChannelsByHash<span class="op">(</span><span class="at">const</span> <span class="dt">uint8_t</span><span class="op">*</span> hash<span class="op">,</span> mesh<span class="op">::</span>GroupChannel dest<span class="op">[],</span> <span class="dt">int</span> max_matches<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> n <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> MAX_GROUP_CHANNELS <span class="op">&amp;&amp;</span> n <span class="op">&lt;</span> max_matches<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>channels<span class="op">[</span>i<span class="op">].</span>channel<span class="op">.</span>hash<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">==</span> hash<span class="op">[</span><span class="dv">0</span><span class="op">])</span> <span class="op">{</span>  <span class="co">// ← only 1 byte compared!</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>      dest<span class="op">[</span>n<span class="op">++]</span> <span class="op">=</span> channels<span class="op">[</span>i<span class="op">].</span>channel<span class="op">;</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> n<span class="op">;</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Code (receive path — 1-byte extraction):</strong></p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Mesh.cpp — onRecvPacket()</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">case</span> PAYLOAD_TYPE_GRP_DATA<span class="op">:</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">case</span> PAYLOAD_TYPE_GRP_TXT<span class="op">:</span> <span class="op">{</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span> channel_hash <span class="op">=</span> pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">++];</span>  <span class="co">// ← only 1 byte read from packet</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">uint8_t</span><span class="op">*</span> macAndData <span class="op">=</span> <span class="op">&amp;</span>pkt<span class="op">-&gt;</span>payload<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>      <span class="co">// ...</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">int</span> num <span class="op">=</span> searchChannelsByHash<span class="op">(&amp;</span>channel_hash<span class="op">,</span> channels<span class="op">,</span> <span class="dv">4</span><span class="op">);</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> j <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> j <span class="op">&lt;</span> num<span class="op">;</span> j<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        <span class="dt">int</span> len <span class="op">=</span> Utils<span class="op">::</span>MACThenDecrypt<span class="op">(</span>channels<span class="op">[</span>j<span class="op">].</span>secret<span class="op">,</span> data<span class="op">,</span> macAndData<span class="op">,</span> pkt<span class="op">-&gt;</span>payload_len <span class="op">-</span> i<span class="op">);</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>len <span class="op">&gt;</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span>  <span class="co">// MAC matched — packet accepted, even if content is garbage</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>          onGroupDataRecv<span class="op">(</span>pkt<span class="op">,</span> pkt<span class="op">-&gt;</span>getPayloadType<span class="op">(),</span> channels<span class="op">[</span>j<span class="op">],</span> data<span class="op">,</span> len<span class="op">);</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>          <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>      <span class="op">}</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span></code></pre></div>
+<p><strong>Code (packet construction — 1-byte hash
+written):</strong></p>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Mesh.cpp — createGroupDatagram()</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> len <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  memcpy<span class="op">(&amp;</span>packet<span class="op">-&gt;</span>payload<span class="op">[</span>len<span class="op">],</span> channel<span class="op">.</span>hash<span class="op">,</span> PATH_HASH_SIZE<span class="op">);</span> len <span class="op">+=</span> PATH_HASH_SIZE<span class="op">;</span>  <span class="co">// ← 1 byte</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  len <span class="op">+=</span> Utils<span class="op">::</span>encryptThenMAC<span class="op">(</span>channel<span class="op">.</span>secret<span class="op">,</span> <span class="op">&amp;</span>packet<span class="op">-&gt;</span>payload<span class="op">[</span>len<span class="op">],</span> data<span class="op">,</span> data_len<span class="op">);</span></span></code></pre></div>
+<p><strong>Code (protocol constant):</strong></p>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">// MeshCore.h</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#define PATH_HASH_SIZE       </span><span class="dv">1</span><span class="pp">   </span><span class="co">// ← only 1 byte for all hash-based lookups</span></span></code></pre></div>
+<pre><code>
+---
+
+### Bug #15 — LOW: `RNG::nextInt` Has Modular Bias and Division-by-Zero Risk
+
+**File:** `src/Utils.cpp`, `examples/companion_radio/MyMesh.cpp`  
+**Impact:** Division by zero crash if `_max == _min`; biased random output for BLE PIN generation.
+
+**Worst-Case Outcome:** **Latent undefined behavior** — not remotely triggerable in current firmware. All callers use hardcoded bounds where `_min &lt; _max` (e.g., `nextInt(0, 5)`, `nextInt(1, 4)`, `nextInt(100000, 999999)`). The div-by-zero would only occur if a future caller passes dynamically computed bounds where equality is possible (e.g., `nextInt(0, num_peers)` when `num_peers == 0`). On ARM Cortex-M, unsigned integer modulo by zero is undefined behavior — GCC on ARM typically returns 0 silently, but some toolchains trap to HardFault → device reboot. The modular bias affects BLE PIN generation (`nextInt(100000, 999999)`, range = 899,999): 19.1% of PINs are ~0.02% more likely, reducing entropy from 19.78 bits to 19.78 bits (loss &lt; 0.001 bits — negligible). BLE PIN range also incorrectly excludes 999999 (should be `nextInt(100000, 1000000)`). All firmware roles are potentially affected if a div-by-zero caller is added.
+
+**Description:**  
+The modulo operation `num % (_max - _min)` introduces bias when the range doesn&#39;t divide evenly into 2^32. More critically, if `_max == _min`, the expression becomes `num % 0`, which is undefined behavior in C++ — on most embedded platforms this causes a hardware fault / crash / hang.
+
+**Code:**
+```cpp
+// Utils.cpp
+uint32_t RNG::nextInt(uint32_t _min, uint32_t _max) {
+  uint32_t num;
+  random((uint8_t *) &amp;num, sizeof(num));
+  return (num % (_max - _min)) + _min;  // ← div-by-zero if _max == _min
+}</code></pre>
+<p><strong>Code (BLE PIN — excluded range):</strong></p>
+<div class="sourceCode" id="cb22"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">// companion_radio/MyMesh.cpp</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  _active_ble_pin <span class="op">=</span> rng<span class="op">.</span>nextInt<span class="op">(</span><span class="dv">100000</span><span class="op">,</span> <span class="dv">999999</span><span class="op">);</span> <span class="co">// ← excludes 999999; should be 1000000</span></span></code></pre></div>
+<p><strong>All current callers (safe in stock firmware):</strong> | Call
+Site | _min | _max | Purpose | |———–|——|——|——–| |
+<code>Mesh.cpp getRetransmitDelay</code> | 0 | 5 | Retransmit jitter | |
+<code>Mesh.cpp getCADFailRetryDelay</code> | 1 | 4 | CAD retry delay | |
+<code>SensorMesh.cpp</code> | 0 | 6 | Sensor retransmit | |
+<code>MyMesh.cpp</code> (repeater/room/companion) | 0 | 5*t+1 |
+Retransmit jitter | | <code>MyMesh.cpp</code> (companion BLE) | 100000 |
+999999 | BLE pairing PIN |</p>
+<hr />
+<h3 id="bug-16-low-no-replay-protection-in-encrypt-then-mac-scheme">Bug
+#16 — LOW: No Replay Protection in Encrypt-then-MAC Scheme</h3>
+<p><strong>File:</strong> <code>src/Utils.cpp</code><br />
+<strong>Impact:</strong> Previously captured packets can be replayed
+after the <code>hasSeen</code> hash table cycles.</p>
+<p><strong>Description:</strong><br />
+The encrypt-then-MAC scheme uses only the shared secret for HMAC — no
+sequence number, nonce, or timestamp participates in the MAC. While the
+<code>SimpleMeshTables::hasSeen()</code> table provides deduplication,
+it is a small cyclic buffer (128 entries). After enough new packets are
+seen, old entries are evicted and a replayed packet will be accepted as
+new. This enables delayed replay attacks.</p>
+<hr />
+<h3
+id="bug-17-low-identitystore-buffer-overflow-in-filename-construction">Bug
+#17 — LOW: <code>IdentityStore</code> Buffer Overflow in Filename
+Construction</h3>
+<p><strong>File:</strong>
+<code>src/helpers/IdentityStore.cpp</code><br />
+<strong>Impact:</strong> Stack buffer overflow if directory path + name
+exceeds ~34 characters.</p>
+<p><strong>Worst-Case Outcome:</strong> <strong>Latent stack
+overflow</strong> – not triggerable in current firmware. All four
+methods (<code>load</code> x2, <code>save</code> x2) use
+<code>sprintf(filename, "%s/%s.id", _dir, name)</code> into a
+<code>char filename[40]</code> stack buffer. Every call site in the
+codebase (26 total across all firmware variants) uses hardcoded
+<code>_dir</code> values (<code>""</code> on nRF52/STM32,
+<code>"/identity"</code> on ESP32/RP2040) and the hardcoded literal
+<code>"_main"</code> as <code>name</code>. The worst-case current output
+is <code>"/identity/_main.id"</code> = 19 bytes, well within the 40-byte
+buffer (21-byte margin). Neither <code>_dir</code> nor <code>name</code>
+is reachable from any serial, BLE, or CLI command. The bug becomes
+exploitable only if a future code change passes user-controlled input
+(e.g., contact names, CLI arguments) as the <code>name</code> parameter.
+A name longer than ~25 characters (with <code>_dir="/identity"</code>)
+would overflow the buffer by up to tens of bytes, corrupting the ARM
+saved registers and return address on the stack – causing a crash or
+potentially controlled code execution.</p>
+<p><strong>Description:</strong><br />
+<code>sprintf(filename, "%s/%s.id", _dir, name)</code> writes into a
+40-byte <code>char filename[40]</code> buffer with no length check.
+While <code>name</code> is typically set programmatically, a long
+<code>_dir</code> configuration string could push the total past 40
+bytes.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co">// IdentityStore.cpp -- same pattern in all four methods</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="dt">bool</span> IdentityStore<span class="op">::</span>load<span class="op">(</span><span class="at">const</span> <span class="dt">char</span> <span class="op">*</span>name<span class="op">,</span> mesh<span class="op">::</span>LocalIdentity<span class="op">&amp;</span> id<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> loaded <span class="op">=</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">char</span> filename<span class="op">[</span><span class="dv">40</span><span class="op">];</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  sprintf<span class="op">(</span>filename<span class="op">,</span> <span class="st">&quot;</span><span class="sc">%s</span><span class="st">/</span><span class="sc">%s</span><span class="st">.id&quot;</span><span class="op">,</span> _dir<span class="op">,</span> name<span class="op">);</span>  <span class="co">// &lt;- no size check</span></span></code></pre></div>
+<p><strong>All callers verified safe:</strong> | Caller | _dir | name |
+Output bytes | |——–|——|——|————–| | All nRF52/STM32 variants |
+<code>""</code> | <code>"_main"</code> | 10 | | All ESP32/RP2040
+variants | <code>"/identity"</code> | <code>"_main"</code> | 19 |</p>
+<hr />
+<h3
+id="bug-18-low-passwords-stored-unencrypted-on-flash-and-echoed-in-cli-replies">Bug
+#18 — LOW: Passwords Stored Unencrypted on Flash and Echoed in CLI
+Replies</h3>
+<p><strong>File:</strong> <code>src/helpers/CommonCLI.cpp</code>,
+<code>src/helpers/CommonCLI.h</code>,
+<code>src/helpers/BaseChatMesh.cpp</code><br />
+<strong>Impact:</strong> Admin and guest passwords stored unencrypted on
+flash; echoed in encrypted CLI reply packets that the admin client
+decrypts automatically.</p>
+<p><strong>Worst-Case Outcome:</strong> <strong>Credential
+exposure</strong> requiring admin authentication or physical access.
+Three vectors: (1) The <code>"password &lt;new&gt;"</code> CLI command
+echoes the new admin password in the encrypted reply:
+<code>sprintf(reply, "password now: %s", _prefs-&gt;password)</code>.
+The reply IS encrypted (AES-ECB) over the radio, but the admin’s
+companion radio decrypts it automatically — the plaintext password
+appears in the meshcore_py event payload and app UI. (2) The
+<code>"get guest.password"</code> CLI command returns the guest password
+in an encrypted reply:
+<code>sprintf(reply, "&gt; %s", _prefs-&gt;guest_password)</code> —
+again, decrypted automatically by the client. (3) Both passwords are
+stored as raw <code>char[16]</code> at known offsets in the
+<code>/com_prefs</code> flash file (admin at offset 56, guest at offset
+88) with no encryption or hashing — physical access to the device allows
+trivial extraction. The login protocol sends the password as plaintext
+within AES-ECB encrypted ANON_REQ packets (<code>sendLogin()</code> in
+BaseChatMesh.cpp), enabling ciphertext pattern analysis (same password =
+same ECB block). All roles affected (repeater, room server, sensor).</p>
+<p><strong>Description:</strong><br />
+When an admin sets or changes the password, the reply echoes the new
+password in the encrypted CLI response. The
+<code>get guest.password</code> command returns the guest password in an
+encrypted reply. In both cases, the admin’s companion radio decrypts the
+reply automatically, so the plaintext password is visible to the client
+software. Additionally, all passwords are stored in plaintext in the
+preferences file on flash — anyone with physical device access can
+extract credentials directly.</p>
+<p><strong>Code (admin password echo):</strong></p>
+<div class="sourceCode" id="cb24"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:284</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>memcmp<span class="op">(</span>command<span class="op">,</span> <span class="st">&quot;password &quot;</span><span class="op">,</span> <span class="dv">9</span><span class="op">)</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>      StrHelper<span class="op">::</span>strncpy<span class="op">(</span>_prefs<span class="op">-&gt;</span>password<span class="op">,</span> <span class="op">&amp;</span>command<span class="op">[</span><span class="dv">9</span><span class="op">],</span> <span class="kw">sizeof</span><span class="op">(</span>_prefs<span class="op">-&gt;</span>password<span class="op">));</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>      savePrefs<span class="op">();</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>      sprintf<span class="op">(</span>reply<span class="op">,</span> <span class="st">&quot;password now: </span><span class="sc">%s</span><span class="st">&quot;</span><span class="op">,</span> _prefs<span class="op">-&gt;</span>password<span class="op">);</span>   <span class="co">// &lt;- echoed over radio!</span></span></code></pre></div>
+<p><strong>Code (guest password retrieval):</strong></p>
+<div class="sourceCode" id="cb25"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:754</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>memcmp<span class="op">(</span>config<span class="op">,</span> <span class="st">&quot;guest.password&quot;</span><span class="op">,</span> <span class="dv">14</span><span class="op">)</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    sprintf<span class="op">(</span>reply<span class="op">,</span> <span class="st">&quot;&gt; </span><span class="sc">%s</span><span class="st">&quot;</span><span class="op">,</span> _prefs<span class="op">-&gt;</span>guest_password<span class="op">);</span>  <span class="co">// &lt;- plaintext over radio</span></span></code></pre></div>
+<p><strong>Code (login sends password in payload):</strong></p>
+<div class="sourceCode" id="cb26"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co">// BaseChatMesh.cpp:558</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    memcpy<span class="op">(&amp;</span>temp<span class="op">[</span><span class="dv">4</span><span class="op">],</span> password<span class="op">,</span> len<span class="op">);</span>  <span class="co">// &lt;- password plaintext in encrypted packet</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    pkt <span class="op">=</span> createAnonDatagram<span class="op">(</span>PAYLOAD_TYPE_ANON_REQ<span class="op">,</span> self_id<span class="op">,</span> recipient<span class="op">.</span>id<span class="op">,</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>                             recipient<span class="op">.</span>getSharedSecret<span class="op">(</span>self_id<span class="op">),</span> temp<span class="op">,</span> tlen<span class="op">);</span></span></code></pre></div>
+<p><strong>Code (flash storage – no encryption):</strong></p>
+<div class="sourceCode" id="cb27"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CommonCLI.cpp:savePrefs()</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    file<span class="op">.</span>write<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)&amp;</span>_prefs<span class="op">-&gt;</span>password<span class="op">[</span><span class="dv">0</span><span class="op">],</span> <span class="kw">sizeof</span><span class="op">(</span>_prefs<span class="op">-&gt;</span>password<span class="op">));</span>       <span class="co">// offset 56</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    file<span class="op">.</span>write<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)&amp;</span>_prefs<span class="op">-&gt;</span>guest_password<span class="op">[</span><span class="dv">0</span><span class="op">],</span> <span class="kw">sizeof</span><span class="op">(</span>_prefs<span class="op">-&gt;</span>guest_password<span class="op">));</span> <span class="co">// offset 88</span></span></code></pre></div>
+<hr />
+<h3 id="bug-19-low-ftoaftoa3-static-buffer-not-reentrant">Bug #19 — LOW:
+<code>ftoa</code>/<code>ftoa3</code> Static Buffer Not Reentrant</h3>
+<p><strong>File:</strong>
+<code>src/helpers/TxtDataHelpers.cpp</code><br />
+<strong>Impact:</strong> Corrupted output when called twice in one
+expression (e.g. in <code>sprintf</code> argument list).</p>
+<p><strong>Worst-Case Outcome:</strong> Latent wrong CLI response –
+<strong>not triggerable in current firmware</strong>. All 9 call sites
+in <code>CommonCLI.cpp</code> use a single
+<code>ftoa</code>/<code>ftoa3</code> per expression, or explicitly
+<code>strcpy</code> to a local buffer before the next call (the “radio”
+getter at lines 775-777). The bug will manifest only if a future
+developer writes
+<code>sprintf(reply, "%s,%s", ftoa(lat), ftoa(lon))</code> – since both
+calls return a pointer to the same <code>static char[16]</code> buffer,
+the second call overwrites the first, and both <code>%s</code> format
+arguments resolve to the same (second) value. The result is a duplicated
+value in the CLI response text (e.g. “3.45,3.45” instead of
+“1.23,3.45”). <strong>No memory corruption, no crash, no security
+impact</strong> – only incorrect text output. The developer was clearly
+aware of the problem (the explicit <code>strcpy</code> workaround proves
+it), but the pattern is fragile and easy to misuse.</p>
+<p><strong>PoC:</strong> <code>bug19-ftoa-static-buffer.py</code><br />
+<strong>Patch:</strong> <code>bug19-ftoa-static-buffer.patch</code></p>
+<p><strong>Description:</strong><br />
+Both <code>StrHelper::ftoa()</code> and <code>StrHelper::ftoa3()</code>
+return a pointer to a <code>static char</code> buffer. If called twice
+in the same <code>sprintf</code> or expression, the second call
+overwrites the first result before it is consumed. The
+<code>handleGetCmd</code> code for “radio” params works around this by
+copying to local buffers, but other call sites may not.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb28"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">// TxtDataHelpers.cpp</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="at">const</span> <span class="dt">char</span><span class="op">*</span> StrHelper<span class="op">::</span>ftoa<span class="op">(</span><span class="dt">float</span> f<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">static</span> <span class="dt">char</span> tmp<span class="op">[</span><span class="dv">16</span><span class="op">];</span>  <span class="co">// &lt;- shared across all calls</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> status<span class="op">;</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>  _ftoa<span class="op">(</span>f<span class="op">,</span> tmp<span class="op">,</span> <span class="op">&amp;</span>status<span class="op">);</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// ...</span></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> tmp<span class="op">;</span>  <span class="co">// &lt;- pointer to static buffer, next call overwrites</span></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="at">const</span> <span class="dt">char</span><span class="op">*</span> StrHelper<span class="op">::</span>ftoa3<span class="op">(</span><span class="dt">float</span> f<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">static</span> <span class="dt">char</span> s<span class="op">[</span><span class="dv">16</span><span class="op">];</span>  <span class="co">// &lt;- same problem</span></span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// ...</span></span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> s<span class="op">;</span></span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Severity Review:</strong> Keeping <strong>LOW</strong>. The
+bug is entirely latent – no current call site triggers it, and the
+impact if triggered is limited to wrong text in a CLI response (no
+memory safety issue). The fix is straightforward: change the API to
+accept a caller-provided buffer.</p>
+<hr />
+<h3 id="bug-20-low-serial-frame-truncation-returns-corrupt-data">Bug #20
+— LOW: Serial Frame Truncation Returns Corrupt Data</h3>
+<p><strong>File:</strong>
+<code>src/helpers/ArduinoSerialInterface.cpp</code><br />
+<strong>Impact:</strong> When oversized frames arrive, a
+partially-captured truncated frame is returned as valid.</p>
+<p><strong>Worst-Case Outcome:</strong> Silent data loss on long serial
+messages – affects <strong>only serial (UART) connections</strong>, not
+BLE or WiFi. When a companion app or meshcore_py script sends a frame
+larger than <code>MAX_FRAME_SIZE</code> (172 bytes) over serial,
+<code>checkRecvFrame()</code> stores the first 172 bytes in
+<code>rx_buf</code> and discards the rest. When all
+<code>_frame_len</code> bytes have been read from UART, the code clamps
+<code>_frame_len</code> to 172 and returns the truncated buffer as a
+valid frame. The command handler (<code>handleCmdFrame</code>) then
+parses a shorter-than-intended payload. In practice, this affects
+<code>CMD_SEND_TXT_MSG</code> and <code>CMD_SEND_CHANNEL_TXT_MSG</code>
+with long text payloads – the message is silently shortened before
+encryption and transmission. <strong>No crash, no memory corruption, no
+security impact</strong> – just data loss. The <code>meshcore_py</code>
+library’s <code>serial_cx.py</code> has no outbound size limit, so it
+can trigger this. The WiFi interface (<code>SerialWifiInterface</code>)
+already correctly rejects oversized frames with a debug log. The BLE
+interfaces are naturally limited by MTU.</p>
+<p><strong>PoC:</strong> <code>bug20-serial-truncation.py</code><br />
+<strong>Patch:</strong> <code>bug20-serial-truncation.patch</code></p>
+<p><strong>Description:</strong><br />
+When <code>_frame_len &gt; MAX_FRAME_SIZE</code>, the code reads bytes
+into <code>rx_buf</code> only up to <code>MAX_FRAME_SIZE</code> and
+discards the rest. But when the frame is “complete” (all
+<code>_frame_len</code> bytes received), it truncates
+<code>_frame_len</code> to <code>MAX_FRAME_SIZE</code> and returns the
+buffer. The problem is that <code>rx_buf</code> contains only the
+<em>first</em> <code>MAX_FRAME_SIZE</code> bytes, but the frame may have
+been longer — the caller receives a truncated, potentially malformed
+frame and tries to parse it.</p>
+<p><strong>Code:</strong></p>
+<div class="sourceCode" id="cb29"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co">// ArduinoSerialInterface.cpp — checkRecvFrame()</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>      <span class="cf">default</span><span class="op">:</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>rx_len <span class="op">&lt;</span> MAX_FRAME_SIZE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>          rx_buf<span class="op">[</span>rx_len<span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint8_t</span><span class="op">)</span>c<span class="op">;</span>   <span class="co">// rest of frame will be discarded if &gt; MAX</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>        rx_len<span class="op">++;</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>rx_len <span class="op">&gt;=</span> _frame_len<span class="op">)</span> <span class="op">{</span>  <span class="co">// received a complete frame?</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> <span class="op">(</span>_frame_len <span class="op">&gt;</span> MAX_FRAME_SIZE<span class="op">)</span> _frame_len <span class="op">=</span> MAX_FRAME_SIZE<span class="op">;</span>    <span class="co">// truncate</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>          memcpy<span class="op">(</span>dest<span class="op">,</span> rx_buf<span class="op">,</span> _frame_len<span class="op">);</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>          _state <span class="op">=</span> RECV_STATE_IDLE<span class="op">;</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>          <span class="cf">return</span> _frame_len<span class="op">;</span>  <span class="co">// &lt;- returns truncated/corrupt data as if valid</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span></code></pre></div>
+<p><strong>Severity Review:</strong> Keeping <strong>LOW</strong>. The
+bug only affects serial UART connections (not BLE, not WiFi). The impact
+is silent text truncation – no memory safety issue, no crash, no
+security impact. Most real-world usage is via BLE (phone apps), which is
+unaffected.</p>
+<hr />
+<h3
+id="bug-22-critical-synchronous-flash-write-during-acl.save-blocks-radio-and-causes-hang">Bug
+#22 — CRITICAL: Synchronous Flash Write During <code>acl.save()</code>
+Blocks Radio and Causes Hang</h3>
+<p><strong>File:</strong> <code>src/helpers/ClientACL.cpp</code>,
+<code>examples/simple_repeater/MyMesh.cpp</code> (line ~1294)<br />
+<strong>Impact:</strong> Device becomes unresponsive for 200–500 ms on
+every login; on nRF52 with BLE this can drop the BLE connection
+entirely. Confirmed to cause observable “hang” on repeater login.</p>
+<p><strong>Worst-Case Outcome:</strong> <strong>Permanent radio hang
+(requires reboot)</strong> on nRF52 repeaters and room servers. When
+<code>acl.save()</code> triggers flash page erase via the SoftDevice,
+the CPU is halted for ~85 ms per page. If the SX1262 LoRa radio has an
+active SPI transaction at that moment, the SPI bus is corrupted — the
+radio enters an undefined state and <strong>never recovers</strong>.
+This chains into Bug #9 (stuck detection with no recovery). The node
+appears partially alive (BLE responds, serial works) but is permanently
+deaf to all LoRa mesh traffic. Risk scales with ACL size: more enrolled
+clients = more flash pages to erase/write = wider time window for SPI
+collision. On ESP32 the flash subsystem is less blocking, so the impact
+is a 200-500 ms radio blackout (temporary, not permanent). Triggered
+reliably ~5 seconds after any first client login to a repeater.</p>
+<p><strong>Description:</strong><br />
+After a successful password login, the repeater sets
+<code>dirty_contacts_expiry = futureMillis(5000)</code>. Five seconds
+later, in the main <code>loop()</code>, <code>acl.save(_fs)</code> is
+called. This performs a <strong>synchronous</strong> flash file delete +
+rewrite of the entire client table (up to 20 clients × 136 bytes = 2720
+bytes).</p>
+<p>On <strong>nRF52 with SoftDevice</strong> (BLE), the
+<code>openWrite()</code> function first calls
+<code>_fs-&gt;remove("/s_contacts")</code> which triggers a flash page
+erase via <code>sd_flash_page_erase()</code>. A single page erase takes
+~85 ms during which the SoftDevice blocks CPU execution. Then the
+subsequent <code>file.write()</code> calls trigger additional flash page
+program operations. The total blocking time can reach <strong>200–500
+ms</strong>.</p>
+<p>During this entire blocking period: 1.
+<code>Dispatcher::loop()</code> is not called — no radio RX/TX
+processing occurs 2. The radio ISR may fire (setting
+<code>STATE_INT_READY</code>), but <code>recvRaw()</code> is never
+called to service it 3. If the radio was mid-transmit of the login
+reply, the <code>outbound_expiry</code> timer may pass, causing the
+reply to be marked as a TX failure 4. On nRF52 with BLE, the SoftDevice
+may lose BLE connection events during prolonged flash operations,
+causing the <strong>BLE serial link to disconnect</strong> 5. The
+8-second “radio stuck” detector (Bug #9) doesn’t help because it only
+sets a flag with no recovery action</p>
+<p>Because login is the <strong>one operation guaranteed to dirty the
+ACL</strong> for a new client, this bug is triggered reliably on every
+first login to a repeater.</p>
+<p><strong>Code (loop triggers save after 5-second delay):</strong></p>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">// MyMesh.cpp — loop()</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// is pending dirty contacts write needed?</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>dirty_contacts_expiry <span class="op">&amp;&amp;</span> millisHasNowPassed<span class="op">(</span>dirty_contacts_expiry<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    acl<span class="op">.</span>save<span class="op">(</span>_fs<span class="op">);</span>              <span class="co">// ← blocks main loop for 200-500ms!</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    dirty_contacts_expiry <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span></code></pre></div>
+<p><strong>Code (save performs synchronous flash delete +
+write):</strong></p>
+<div class="sourceCode" id="cb31"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">// ClientACL.cpp — openWrite() on nRF52</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="at">static</span> File openWrite<span class="op">(</span>FILESYSTEM<span class="op">*</span> _fs<span class="op">,</span> <span class="at">const</span> <span class="dt">char</span><span class="op">*</span> filename<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="pp">#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    _fs<span class="op">-&gt;</span>remove<span class="op">(</span>filename<span class="op">);</span>                    <span class="co">// ← flash page ERASE (~85ms per page)</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> _fs<span class="op">-&gt;</span>open<span class="op">(</span>filename<span class="op">,</span> FILE_O_WRITE<span class="op">);</span> <span class="co">// ← allocate new file</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="pp">#else</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> _fs<span class="op">-&gt;</span>open<span class="op">(</span>filename<span class="op">,</span> <span class="st">&quot;w&quot;</span><span class="op">,</span> <span class="kw">true</span><span class="op">);</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  <span class="pp">#endif</span></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="co">// ClientACL.cpp — save()</span></span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> ClientACL<span class="op">::</span>save<span class="op">(</span>FILESYSTEM<span class="op">*</span> fs<span class="op">,</span> <span class="dt">bool</span> <span class="op">(*</span>filter<span class="op">)(</span>ClientInfo<span class="op">*))</span> <span class="op">{</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>  File file <span class="op">=</span> openWrite<span class="op">(</span>_fs<span class="op">,</span> <span class="st">&quot;/s_contacts&quot;</span><span class="op">);</span></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="op">(</span>file<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> num_clients<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>      <span class="kw">auto</span> c <span class="op">=</span> <span class="op">&amp;</span>clients<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>      <span class="co">// 136 bytes per client × up to 20 clients = 2720 bytes of flash writes</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>      file<span class="op">.</span>write<span class="op">(</span>c<span class="op">-&gt;</span>id<span class="op">.</span>pub_key<span class="op">,</span> <span class="dv">32</span><span class="op">);</span>       <span class="co">// ← each write may trigger flash page program</span></span>
+<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a>      file<span class="op">.</span>write<span class="op">((</span><span class="dt">uint8_t</span> <span class="op">*)&amp;</span>c<span class="op">-&gt;</span>permissions<span class="op">,</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>      <span class="co">// ... more writes ...</span></span>
+<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>      file<span class="op">.</span>write<span class="op">(</span>c<span class="op">-&gt;</span>out_path<span class="op">,</span> <span class="dv">64</span><span class="op">);</span></span>
+<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a>      file<span class="op">.</span>write<span class="op">(</span>c<span class="op">-&gt;</span>shared_secret<span class="op">,</span> PUB_KEY_SIZE<span class="op">);</span></span>
+<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb31-24"><a href="#cb31-24" aria-hidden="true" tabindex="-1"></a>    file<span class="op">.</span>close<span class="op">();</span>                           <span class="co">// ← final flush + metadata write</span></span>
+<span id="cb31-25"><a href="#cb31-25" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb31-26"><a href="#cb31-26" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Code (login sets the dirty flag):</strong></p>
+<div class="sourceCode" id="cb32"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">// MyMesh.cpp — handleLoginReq()</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>perms <span class="op">!=</span> PERM_ACL_GUEST<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>      dirty_contacts_expiry <span class="op">=</span> futureMillis<span class="op">(</span>LAZY_CONTACTS_WRITE_DELAY<span class="op">);</span> <span class="co">// 5000ms</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span></code></pre></div>
+<hr />
+<h2 id="most-likely-to-cause-device-hang-unresponsive">Most Likely to
+Cause Device Hang / Unresponsive</h2>
+<table>
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 18%" />
+<col style="width: 26%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Bug #</th>
+<th>Severity</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>#22</strong></td>
+<td>CRITICAL</td>
+<td><code>acl.save()</code> blocks main loop 200–500 ms — SPI corruption
+on nRF52 permanently kills LoRa radio; <strong>triggered by normal first
+login</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>#1</strong></td>
+<td>CRITICAL</td>
+<td>OOB write on <code>data[len]=0</code> corrupts stack — immediate
+crash on receiving max-length text message</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>#4</strong></td>
+<td>HIGH</td>
+<td>Packet pool exhaustion via flood/TRACE abuse — node permanently
+drops all traffic</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>#9</strong></td>
+<td>HIGH</td>
+<td>Radio stuck in non-RX with no recovery — device permanently deaf
+(chains from #22)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>#6</strong></td>
+<td>HIGH</td>
+<td>TRACE flood drains TX budget and fills queue — node stops responding
+to normal messages (self-recovers)</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>#7</strong></td>
+<td>HIGH</td>
+<td>Unbounded sprintf overflow — 30-byte stack corruption via BLE/radio
+CLI command</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>#15</strong></td>
+<td>LOW</td>
+<td><code>RNG::nextInt</code> division-by-zero if
+<code>_max == _min</code> — latent UB, not remotely triggerable</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
