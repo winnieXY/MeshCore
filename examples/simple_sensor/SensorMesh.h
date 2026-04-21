@@ -138,6 +138,7 @@ private:
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   unsigned long dirty_contacts_expiry;
+  uint8_t dirty_contacts_defer_count;
   CayenneLPP telemetry;
   TransportKeyStore key_store;
   RegionMap region_map;
