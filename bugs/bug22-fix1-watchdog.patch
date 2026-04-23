@@ -1,0 +1,262 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: MeshCore Security Audit <audit@meshcore.local>
+Date: Tue, 22 Apr 2026 00:00:00 +0000
+Subject: [PATCH 1/3] bug22: Add hardware watchdog (WDT) for nRF52 platforms
+
+The nRF52840 has no watchdog configured. A HardFault during flash
+operations (the suspected bug22 root cause) causes an infinite loop in
+the Adafruit BSP HardFault handler — the device never recovers.
+
+This patch adds a hardware watchdog timer (WDT) that:
+- Configures a timeout via NRF_WDT registers (default 10 seconds)
+- Is fed (kicked) in every loop() iteration
+- Automatically resets the MCU on HardFault, deadlock, or any hang
+- Uses the HALT+SLEEP run behavior so the WDT keeps counting during
+  debug halts and sleep (conservative safe default)
+- Is configurable via CLI: set wdt <0-255>, get wdt
+  - 0 = disabled, 1-255 = timeout in seconds
+  - Takes effect on next reboot (WDT hardware is lock-once)
+- Persisted in NodePrefs at offset 291 (1 byte)
+
+The WDT is initialized after prefs are loaded in setup(), and fed via
+NRF52Board::feedWatchdog() called from each variant's loop().
+
+OTA update is not affected: the DFU service resets the MCU via
+NVIC_SystemReset() which clears the WDT. The bootloader runs without
+the watchdog until the new application starts and re-enables it.
+
+Default value: 0 (disabled). This is safe for existing devices that
+upgrade — their prefs file has 0x00 at offset 291 (never written),
+so the WDT stays off until explicitly enabled via "set wdt 10".
+---
+ examples/simple_repeater/main.cpp    |  5 +++++
+ examples/simple_room_server/main.cpp |  5 +++++
+ examples/simple_sensor/main.cpp      |  5 +++++
+ src/helpers/CommonCLI.cpp            | 19 +++++++++++++++
+ src/helpers/CommonCLI.h              |  1 +
+ src/helpers/NRF52Board.cpp           | 40 +++++++++++++++++++++++++++++++
+ src/helpers/NRF52Board.h             |  9 +++++++
+ 7 files changed, 84 insertions(+)
+
+diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
+index 0000001..0000002 100644
+--- a/src/helpers/CommonCLI.h
++++ b/src/helpers/CommonCLI.h
+@@ -64,6 +64,7 @@ struct NodePrefs { // persisted to file
+   uint8_t rx_boosted_gain; // power settings
+   uint8_t path_hash_mode;   // which path mode to use when sending
+   uint8_t loop_detect;
++  uint8_t wdt_timeout_secs; // 0=disabled, 1-255=seconds (nRF52 only, applies on reboot)
+ };
+ 
+ class CommonCLICallbacks {
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index 0000001..0000002 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -90,7 +90,9 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
+     file.read((uint8_t *)&_prefs->rx_boosted_gain, sizeof(_prefs->rx_boosted_gain));              // 290
+-    // next: 291
++    file.read((uint8_t *)&_prefs->wdt_timeout_secs, sizeof(_prefs->wdt_timeout_secs));            // 291
++    // next: 292
+ 
+     // sanitise bad pref values
+     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
+@@ -120,6 +122,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
+ 
+     // sanitise settings
+     _prefs->rx_boosted_gain = constrain(_prefs->rx_boosted_gain, 0, 1); // boolean
++    // wdt_timeout_secs: 0 is valid (disabled), no constrain needed — uint8_t can't exceed 255
+ 
+     file.close();
+   }
+@@ -181,7 +184,8 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
+     file.write((uint8_t *)&_prefs->rx_boosted_gain, sizeof(_prefs->rx_boosted_gain));              // 290
+-    // next: 291
++    file.write((uint8_t *)&_prefs->wdt_timeout_secs, sizeof(_prefs->wdt_timeout_secs));            // 291
++    // next: 292
+ 
+     file.close();
+   }
+@@ -655,6 +659,15 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+       _prefs->loop_detect = mode;
+       savePrefs();
+       strcpy(reply, "OK");
++    }
++  } else if (memcmp(config, "wdt ", 4) == 0) {
++    uint32_t val = _atoi(&config[4]);
++    if (val > 255) {
++      strcpy(reply, "Error, must be 0 (off) or 1-255 (seconds)");
++    } else {
++      _prefs->wdt_timeout_secs = (uint8_t)val;
++      savePrefs();
++      sprintf(reply, "OK - WDT %s (reboot to apply)", val == 0 ? "disabled" : "enabled");
+     }
+   } else if (memcmp(config, "tx ", 3) == 0) {
+     _prefs->tx_power_dbm = atoi(&config[3]);
+@@ -807,6 +820,12 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+     } else {
+       strcpy(reply, "> strict");
+     }
++  } else if (memcmp(config, "wdt", 3) == 0 && (config[3] == 0 || config[3] == ' ')) {
++#if defined(NRF52_PLATFORM)
++    sprintf(reply, "> %u secs%s", _prefs->wdt_timeout_secs,
++            _prefs->wdt_timeout_secs == 0 ? " (disabled)" : " (active after reboot)");
++#else
++    strcpy(reply, "> not supported on this platform");
++#endif
+   } else if (memcmp(config, "tx", 2) == 0 && (config[2] == 0 || config[2] == ' ')) {
+     sprintf(reply, "> %d", (int32_t) _prefs->tx_power_dbm);
+   } else if (memcmp(config, "freq", 4) == 0) {
+diff --git a/src/helpers/NRF52Board.h b/src/helpers/NRF52Board.h
+index 0000001..0000002 100644
+--- a/src/helpers/NRF52Board.h
++++ b/src/helpers/NRF52Board.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <Arduino.h>
++#include <nrf.h>
+ #include <MeshCore.h>
+ 
+ #if defined(NRF52_PLATFORM)
+@@ -47,6 +48,14 @@
+   NRF52Board(char *otaname) : ota_name(otaname) {}
+   virtual void begin();
+   virtual uint8_t getStartupReason() const override { return startup_reason; }
++
++  // Hardware watchdog — call feedWatchdog() every loop iteration.
++  // If the MCU hangs (HardFault, deadlock, infinite loop), the WDT will
++  // force a reset. timeout_secs=0 means don't start the WDT.
++  void initWatchdog(uint8_t timeout_secs);
++  inline void feedWatchdog() { if (_wdt_running) NRF_WDT->RR[0] = WDT_RR_RR_Reload; }
++  bool _wdt_running = false;
++
+   virtual float getMCUTemperature() override;
+   virtual void reboot() override { NVIC_SystemReset(); }
+   virtual bool getBootloaderVersion(char* version, size_t max_len) override;
+diff --git a/src/helpers/NRF52Board.cpp b/src/helpers/NRF52Board.cpp
+index 0000001..0000002 100644
+--- a/src/helpers/NRF52Board.cpp
++++ b/src/helpers/NRF52Board.cpp
+@@ -22,6 +22,46 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+ 
+ void NRF52Board::begin() {
+   startup_reason = BD_STARTUP_NORMAL;
++  // NOTE: WDT is NOT started here. It is started from the application's
++  // setup() AFTER loading prefs, by calling initWatchdog(prefs.wdt_timeout_secs).
++  // This allows the timeout to be configured via CLI (set wdt N).
++}
++
++void NRF52Board::initWatchdog(uint8_t timeout_secs) {
++  // 0 = watchdog disabled
++  if (timeout_secs == 0) {
++    MESH_DEBUG_PRINTLN("WDT: Disabled by configuration (set wdt <secs> to enable)");
++    return;
++  }
++
++  // WDT can only be configured once after reset (before TASKS_START).
++  // After START, CRV and CONFIG are read-only and locked until next reset.
++  if (_wdt_running) return;
++
++  // Convert seconds to 32.768 kHz ticks
++  uint32_t ticks = (uint32_t)timeout_secs * 32768UL;
++
++  // Configure WDT behavior:
++  // Bit 0 (SLEEP): 1 = Run in SLEEP mode (keep counting during WFE/WFI)
++  // Bit 3 (HALT):  1 = Run in HALT (debug) mode
++  // This is the safest configuration — WDT counts in all power states.
++  //
++  // NOTE: SLEEP_Run means the WDT keeps counting during board.sleep() / WFE.
++  // This is safe because the Adafruit nRF52 BSP runs FreeRTOS with a ~1ms
++  // tick timer that wakes the CPU from WFE frequently, so loop() and
++  // feedWatchdog() run well within the timeout window. If a future change
++  // enables FreeRTOS tickless idle or any sleep >timeout without waking,
++  // the timeout must be increased or SLEEP_Pause used instead.
++  NRF_WDT->CONFIG = (WDT_CONFIG_SLEEP_Run << WDT_CONFIG_SLEEP_Pos) |
++                     (WDT_CONFIG_HALT_Run << WDT_CONFIG_HALT_Pos);
++
++  NRF_WDT->CRV = ticks;
++  NRF_WDT->RREN = WDT_RREN_RR0_Enabled << WDT_RREN_RR0_Pos;
++  NRF_WDT->TASKS_START = 1;
++
++  _wdt_running = true;
++
++  // Initial kick so the full timeout window is available
++  NRF_WDT->RR[0] = WDT_RR_RR_Reload;
++
++  MESH_DEBUG_PRINTLN("WDT: Started with %u second timeout", (unsigned)timeout_secs);
+ }
+ 
+ #ifdef NRF52_POWER_MANAGEMENT
+diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/main.cpp
++++ b/examples/simple_repeater/main.cpp
+@@ -100,6 +100,10 @@ void setup() {
+ 
+   the_mesh.begin(fs);
+ 
++#if defined(NRF52_PLATFORM)
++  board.initWatchdog(the_mesh.getNodePrefs()->wdt_timeout_secs);
++#endif
++
+ #ifdef DISPLAY_CLASS
+   ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+ #endif
+@@ -107,6 +111,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.feedWatchdog();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_room_server/main.cpp
++++ b/examples/simple_room_server/main.cpp
+@@ -100,6 +100,10 @@ void setup() {
+ 
+   the_mesh.begin(fs);
+ 
++#if defined(NRF52_PLATFORM)
++  board.initWatchdog(the_mesh.getNodePrefs()->wdt_timeout_secs);
++#endif
++
+ #ifdef DISPLAY_CLASS
+   ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+ #endif
+@@ -107,6 +111,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.feedWatchdog();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/examples/simple_sensor/main.cpp b/examples/simple_sensor/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_sensor/main.cpp
++++ b/examples/simple_sensor/main.cpp
+@@ -100,6 +100,10 @@ void setup() {
+ 
+   the_mesh.begin(fs);
+ 
++#if defined(NRF52_PLATFORM)
++  board.initWatchdog(the_mesh.getNodePrefs()->wdt_timeout_secs);
++#endif
++
+ #ifdef DISPLAY_CLASS
+   ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
+ #endif
+@@ -107,6 +111,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.feedWatchdog();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+-- 
+2.40.0

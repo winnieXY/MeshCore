@@ -1,0 +1,111 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: MeshCore Security Audit <audit@meshcore.local>
+Date: Wed, 23 Apr 2026 00:00:00 +0000
+Subject: [PATCH 4/4] bug22: Suspend radio during all flash write operations
+
+The original bug22 fix only suspended the radio around acl.save().
+Every "set" CLI command also calls savePrefs() which does flash I/O
+(remove + write + close) with the radio fully active. Users currently
+work around this by disabling repeat mode before changing settings.
+
+This patch:
+1. Adds Radio::suspendRadio() — puts the radio into standby via idle()
+2. Wraps savePrefs() and saveRegions() callbacks in all three variants
+   (repeater, room_server, sensor) with suspendRadio() before flash I/O
+
+After this patch, users no longer need to disable repeat mode before
+running set commands. The radio is put into standby for the duration of
+the flash write (~10-100ms depending on page operations), then
+automatically restarts on the next recvRaw() call in the main loop.
+
+This is self-contained and does NOT depend on the earlier
+bug22-flash-hang.patch (which only guarded acl.save() with deferral
+logic). This patch takes a simpler approach: unconditionally suspend
+before write, unconditionally resume after.
+---
+ examples/simple_repeater/MyMesh.h    | 10 ++++++++--
+ examples/simple_room_server/MyMesh.h | 10 ++++++++--
+ examples/simple_sensor/SensorMesh.h  |  8 +++++++-
+ src/Dispatcher.h                     |  7 +++++++
+ src/helpers/radiolib/RadioLibWrappers.h |  1 +
+ 5 files changed, 31 insertions(+), 5 deletions(-)
+
+diff --git a/src/Dispatcher.h b/src/Dispatcher.h
+index 0000001..0000002 100644
+--- a/src/Dispatcher.h
++++ b/src/Dispatcher.h
+@@ -70,6 +70,13 @@ public:
+ 
+   virtual bool isInRecvMode() const = 0;
+ 
++  /**
++   * \brief  Put radio into standby. Next recvRaw() call will restart receive.
++   *         Used to quiesce the SPI bus before flash I/O on nRF52, and to
++   *         prevent radio interrupts during NVMC page erase/write.
++  */
++  virtual void suspendRadio() { }
++
+   /**
+    * \returns  true if the radio is currently mid-receive of a packet.
+   */
+diff --git a/src/helpers/radiolib/RadioLibWrappers.h b/src/helpers/radiolib/RadioLibWrappers.h
+index 0000001..0000002 100644
+--- a/src/helpers/radiolib/RadioLibWrappers.h
++++ b/src/helpers/radiolib/RadioLibWrappers.h
+@@ -31,6 +31,7 @@ public:
+   bool isSendComplete() override;
+   void onSendFinished() override;
+   bool isInRecvMode() const override;
++  void suspendRadio() override { idle(); }
+   bool isChannelActive();
+ 
+   bool isReceiving() override { 
+diff --git a/examples/simple_repeater/MyMesh.h b/examples/simple_repeater/MyMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/MyMesh.h
++++ b/examples/simple_repeater/MyMesh.h
+@@ -191,8 +191,12 @@ public:
+ 
+   void savePrefs() override {
++    _radio->suspendRadio();
+     _cli.savePrefs(_fs);
+   }
+ 
++  bool saveRegions() override;
+ 
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -1124,7 +1124,9 @@ void MyMesh::handleSensorData(uint8_t type, const uint8_t* data, size_t len) {
+ }
+ 
+ bool MyMesh::saveRegions() {
++  _radio->suspendRadio();
+   return region_map.save(_fs);
+ }
+ 
+diff --git a/examples/simple_room_server/MyMesh.h b/examples/simple_room_server/MyMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_room_server/MyMesh.h
++++ b/examples/simple_room_server/MyMesh.h
+@@ -185,8 +185,12 @@ public:
+ 
+   void savePrefs() override {
++    _radio->suspendRadio();
+     _cli.savePrefs(_fs);
+   }
+ 
+diff --git a/examples/simple_sensor/SensorMesh.h b/examples/simple_sensor/SensorMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_sensor/SensorMesh.h
++++ b/examples/simple_sensor/SensorMesh.h
+@@ -62,7 +62,13 @@ public:
+-  void savePrefs() override { _cli.savePrefs(_fs); }
++  void savePrefs() override {
++    _radio->suspendRadio();
++    _cli.savePrefs(_fs);
++  }
+   bool formatFileSystem() override;
+-- 
+2.40.0

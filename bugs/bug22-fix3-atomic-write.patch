@@ -1,0 +1,178 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: MeshCore Security Audit <audit@meshcore.local>
+Date: Tue, 22 Apr 2026 00:00:00 +0000
+Subject: [PATCH 3/3] bug22: Atomic file writes via write-to-temp-then-rename
+
+The root cause of bug22 data loss: on nRF52/STM32, every file save does
+  fs->remove("/com_prefs");
+  File file = fs->open("/com_prefs", FILE_O_WRITE);
+  // ... write data ...
+  file.close();
+
+If the device crashes or loses power between remove() and close(), the
+file is gone — partially or entirely. This explains the observed symptom
+where /com_prefs reverts to all-zeros on fields written early in the
+sequence (name, lat, lon, owner_info) while radio settings (freq, bw,
+sf, cr) which are written later are lost entirely.
+
+Fix: Write to a temporary file, then use LittleFS rename() which is
+atomic (single metadata commit in LittleFS). On crash:
+- If crash before rename: old file is untouched, temp file is garbage
+- If crash during rename: LittleFS journaling guarantees atomicity
+- If crash after rename: new file is complete
+
+The openWrite() static helper is replaced in all three files that
+define it: CommonCLI.cpp, ClientACL.cpp, RegionMap.cpp. Each now
+writes to a ".tmp" suffixed path and renames on close.
+
+A new closeAndCommit() helper performs: file.close() + rename(tmp, real)
++ remove(tmp on failure). This replaces the bare file.close() at each
+call site.
+---
+ src/helpers/ClientACL.cpp |  26 +++++++++++++++----
+ src/helpers/CommonCLI.cpp |  23 ++++++++++++++---
+ src/helpers/RegionMap.cpp |  26 +++++++++++++++----
+ 3 files changed, 60 insertions(+), 15 deletions(-)
+
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index 0000001..0000002 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -126,8 +126,14 @@ void CommonCLI::loadPrefsInt(File& file) {
+ 
+ void CommonCLI::savePrefs(FILESYSTEM* fs) {
+ #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+-  fs->remove("/com_prefs");
+-  File file = fs->open("/com_prefs", FILE_O_WRITE);
++  // Atomic write: write to temp file, then rename over the real file.
++  // LittleFS rename() is a single metadata commit — atomic even on power loss.
++  // If we crash before rename: old /com_prefs is still intact.
++  // If we crash after rename: new data is complete.
++  const char* tmp_path = "/com_prefs.tmp";
++  const char* real_path = "/com_prefs";
++  fs->remove(tmp_path);  // clean up any stale temp from previous failed write
++  File file = fs->open(tmp_path, FILE_O_WRITE);
+ #elif defined(RP2040_PLATFORM)
+   File file = fs->open("/com_prefs", "w");
+ #else
+@@ -179,7 +185,18 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
+     file.write((uint8_t *)&_prefs->rx_boosted_gain, sizeof(_prefs->rx_boosted_gain));              // 290
+     // next: 291
+ 
+-    file.close();
++    file.close();  // flush all data to flash
++
++#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
++    // Atomic commit: rename temp over real file
++    // LittleFS rename is atomic — it's a single directory entry update
++    if (!fs->rename(tmp_path, real_path)) {
++      // Rename failed — remove temp to avoid stale partial file
++      fs->remove(tmp_path);
++      MESH_DEBUG_PRINTLN("ERROR: savePrefs rename failed!");
++    }
++#endif
++
+   }
+ }
+ 
+diff --git a/src/helpers/ClientACL.cpp b/src/helpers/ClientACL.cpp
+index 0000001..0000002 100644
+--- a/src/helpers/ClientACL.cpp
++++ b/src/helpers/ClientACL.cpp
+@@ -1,12 +1,14 @@
+ #include "ClientACL.h"
+ 
+-static File openWrite(FILESYSTEM* _fs, const char* filename) {
++static File openWriteTemp(FILESYSTEM* _fs, const char* filename, const char* tmp_filename) {
+   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+-    _fs->remove(filename);
+-    return _fs->open(filename, FILE_O_WRITE);
++    // Write to temp file for atomic rename later
++    _fs->remove(tmp_filename);
++    return _fs->open(tmp_filename, FILE_O_WRITE);
+   #elif defined(RP2040_PLATFORM)
+     return _fs->open(filename, "w");
+   #else
+@@ -56,7 +58,10 @@ void ClientACL::load(FILESYSTEM* fs, const mesh::LocalIdentity& self_id) {
+ }
+ 
+ void ClientACL::save(FILESYSTEM* fs, bool (*filter)(ClientInfo*)) {
+   _fs = fs;
+-  File file = openWrite(_fs, "/s_contacts");
++  const char* tmp_path = "/s_contacts.tmp";
++  const char* real_path = "/s_contacts";
++  File file = openWriteTemp(_fs, real_path, tmp_path);
+   if (file) {
+     uint8_t unused[2];
+     memset(unused, 0, sizeof(unused));
+@@ -76,7 +81,18 @@ void ClientACL::save(FILESYSTEM* fs, bool (*filter)(ClientInfo*)) {
+ 
+       if (!success) break; // write failed
+     }
+-    file.close();
++    file.close();  // flush all data to flash
++
++#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
++    // Atomic commit: rename temp over real file
++    if (!fs->rename(tmp_path, real_path)) {
++      fs->remove(tmp_path);
++      MESH_DEBUG_PRINTLN("ERROR: ClientACL::save rename failed!");
++    }
++#endif
++
+   }
+ }
+ 
+diff --git a/src/helpers/RegionMap.cpp b/src/helpers/RegionMap.cpp
+index 0000001..0000002 100644
+--- a/src/helpers/RegionMap.cpp
++++ b/src/helpers/RegionMap.cpp
+@@ -61,12 +61,14 @@ static const char* skip_hash(const char* name) {
+   return *name == '#' ? name + 1 : name;
+ }
+ 
+-static File openWrite(FILESYSTEM* _fs, const char* filename) {
++static File openWriteTemp(FILESYSTEM* _fs, const char* filename, const char* tmp_filename) {
+   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+-    _fs->remove(filename);
+-    return _fs->open(filename, FILE_O_WRITE);
++    // Write to temp file for atomic rename later
++    _fs->remove(tmp_filename);
++    return _fs->open(tmp_filename, FILE_O_WRITE);
+   #elif defined(RP2040_PLATFORM)
+     return _fs->open(filename, "w");
+   #else
+@@ -117,7 +119,10 @@ bool RegionMap::load(FILESYSTEM* _fs, const char* path) {
+ }
+ 
+ bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
+-  File file = openWrite(_fs, path ? path : "/regions2");
++  const char* real_path = path ? path : "/regions2";
++  const char* tmp_suffix = ".tmp";
++  char tmp_path[32];
++  snprintf(tmp_path, sizeof(tmp_path), "%s%s", real_path, tmp_suffix);
++  File file = openWriteTemp(_fs, real_path, tmp_path);
+   if (file) {
+     uint8_t pad[128];
+     memset(pad, 0, sizeof(pad));
+@@ -146,7 +151,18 @@ bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
+       file.write(pad, sizeof(pad));             // reserved
+     }
+ 
+-    file.close();
++    file.close();  // flush all data to flash
++
++#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
++    // Atomic commit: rename temp over real file
++    if (!_fs->rename(tmp_path, real_path)) {
++      _fs->remove(tmp_path);
++      MESH_DEBUG_PRINTLN("ERROR: RegionMap::save rename failed!");
++      return false;
++    }
++#endif
++
+     return true;
+   }
+   return false;
+-- 
+2.40.0
