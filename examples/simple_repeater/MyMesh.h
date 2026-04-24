@@ -190,6 +190,7 @@ public:
   }
 
   void savePrefs() override {
+    _radio->suspendRadio();
     _cli.savePrefs(_fs);
   }
 

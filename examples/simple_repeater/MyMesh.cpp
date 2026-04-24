@@ -1122,6 +1122,7 @@ void MyMesh::startRegionsLoad() {
 }
 
 bool MyMesh::saveRegions() {
+  _radio->suspendRadio();
   return region_map.save(_fs);
 }
 
