@@ -111,6 +111,9 @@ void setup() {
 
 void loop() {
   board.feedWatchdog();
+#ifdef NRF52_POWER_MANAGEMENT
+  board.logResetReasPeriodic();
+#endif
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
     char c = Serial.read();

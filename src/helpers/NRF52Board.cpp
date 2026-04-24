@@ -152,6 +152,16 @@ const char* NRF52Board::getShutdownReasonString(uint8_t reason) {
   return "Unknown";
 }
 
+void NRF52Board::logResetReasPeriodic() {
+  static uint32_t last_log_ms = 0;
+  uint32_t now = millis();
+  if ((uint32_t)(now - last_log_ms) < 1000) return;
+  last_log_ms = now;
+
+  // reset_reason captured at boot before register is cleared
+  MESH_DEBUG_PRINTLN("RESETREAS=0x%08lX (%s)", (unsigned long)reset_reason, getResetReasonString(reset_reason));
+}
+
 bool NRF52Board::checkBootVoltage(const PowerMgtConfig* config) {
   initPowerMgr();
 

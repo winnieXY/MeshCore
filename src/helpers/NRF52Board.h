@@ -70,6 +70,7 @@ public:
   uint8_t getShutdownReason() const override { return shutdown_reason; }
   const char* getResetReasonString(uint32_t reason) override;
   const char* getShutdownReasonString(uint8_t reason) override;
+  void logResetReasPeriodic();
 #endif
 };
 
