@@ -54,11 +54,6 @@ public:
   virtual bool startOTAUpdate(const char *id, char reply[]) override;
   virtual void sleep(uint32_t secs) override;
 
-  /// Enable SoftDevice (without BLE) for interrupt-safe flash operations.
-  /// Must be called BEFORE board.begin() so DCDC/power uses SD APIs.
-  /// Safe to call if SD is already enabled (returns true immediately).
-  static bool enableSoftDeviceForFlash();
-
 #ifdef NRF52_POWER_MANAGEMENT
   bool isExternalPowered() override;
   uint16_t getBootVoltage() override { return boot_voltage_mv; }
