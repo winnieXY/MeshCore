@@ -1,9 +1,9 @@
 #include "ClientACL.h"
 
-static File openWrite(FILESYSTEM* _fs, const char* filename) {
+static File openWriteTemp(FILESYSTEM* _fs, const char* filename, const char* tmp_filename) {
   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-    _fs->remove(filename);
-    return _fs->open(filename, FILE_O_WRITE);
+    _fs->remove(tmp_filename);
+    return _fs->open(tmp_filename, FILE_O_WRITE);
   #elif defined(RP2040_PLATFORM)
     return _fs->open(filename, "w");
   #else
@@ -54,7 +54,9 @@ void ClientACL::load(FILESYSTEM* fs, const mesh::LocalIdentity& self_id) {
 
 void ClientACL::save(FILESYSTEM* fs, bool (*filter)(ClientInfo*)) {
   _fs = fs;
-  File file = openWrite(_fs, "/s_contacts");
+  const char* tmp_path = "/s_contacts.tmp";
+  const char* real_path = "/s_contacts";
+  File file = openWriteTemp(_fs, real_path, tmp_path);
   if (file) {
     uint8_t unused[2];
     memset(unused, 0, sizeof(unused));
@@ -74,6 +76,13 @@ void ClientACL::save(FILESYSTEM* fs, bool (*filter)(ClientInfo*)) {
       if (!success) break; // write failed
     }
     file.close();
+
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    if (!_fs->rename(tmp_path, real_path)) {
+      _fs->remove(tmp_path);
+      MESH_DEBUG_PRINTLN("ERROR: ClientACL::save rename failed!");
+    }
+#endif
   }
 }
 

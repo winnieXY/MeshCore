@@ -58,10 +58,10 @@ static const char* skip_hash(const char* name) {
   return *name == '#' ? name + 1 : name;
 }
 
-static File openWrite(FILESYSTEM* _fs, const char* filename) {
+static File openWriteTemp(FILESYSTEM* _fs, const char* filename, const char* tmp_filename) {
   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
-    _fs->remove(filename);
-    return _fs->open(filename, FILE_O_WRITE);
+    _fs->remove(tmp_filename);
+    return _fs->open(tmp_filename, FILE_O_WRITE);
   #elif defined(RP2040_PLATFORM)
     return _fs->open(filename, "w");
   #else
@@ -115,7 +115,10 @@ bool RegionMap::load(FILESYSTEM* _fs, const char* path) {
 }
 
 bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
-  File file = openWrite(_fs, path ? path : "/regions2");
+  const char* real_path = path ? path : "/regions2";
+  char tmp_path[32];
+  snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", real_path);
+  File file = openWriteTemp(_fs, real_path, tmp_path);
   if (file) {
     uint8_t pad[128];
     memset(pad, 0, sizeof(pad));
@@ -139,6 +142,14 @@ bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
       }
     }
     file.close();
+
+#if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    if (!_fs->rename(tmp_path, real_path)) {
+      _fs->remove(tmp_path);
+      MESH_DEBUG_PRINTLN("ERROR: RegionMap::save rename failed!");
+      return false;
+    }
+#endif
     return true;
   }
   return false;  // failed
