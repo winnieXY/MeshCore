@@ -1011,8 +1011,19 @@ void MyMesh::loop() {
 
   // is pending dirty contacts write needed?
   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+    if (board.brownoutDetected()) {
+      dirty_contacts_expiry = futureMillis(board.BROWNOUT_RECOVERY_INTERVAL_MS);
+      return;
+    }
     acl.save(_fs, MyMesh::saveFilter);
     dirty_contacts_expiry = 0;
+  }
+
+  // Flush brownout-deferred prefs save
+  if (_prefs_save_pending && !board.brownoutDetected()) {
+    _cli.savePrefs(_fs);
+    _prefs_save_pending = false;
+    MESH_DEBUG_PRINTLN("savePrefs: flushed after brownout recovery");
   }
 
   // TODO: periodically check for OLD/inactive entries in known_clients[], and evict

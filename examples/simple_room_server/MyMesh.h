@@ -101,6 +101,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   ClientACL acl;
   CommonCLI _cli;
   unsigned long dirty_contacts_expiry;
+  bool _prefs_save_pending = false;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   unsigned long next_push;
   uint16_t _num_posted, _num_post_pushes;
@@ -183,7 +184,13 @@ public:
   }
 
   void savePrefs() override {
-    _cli.savePrefs(_fs);
+    if (board.brownoutDetected()) {
+      _prefs_save_pending = true;
+      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
+    } else {
+      _cli.savePrefs(_fs);
+      _prefs_save_pending = false;
+    }
   }
 
   void sendFloodScoped(const TransportKey& scope, mesh::Packet* pkt, uint32_t delay_millis, uint8_t path_hash_size);

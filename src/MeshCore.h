@@ -66,6 +66,11 @@ public:
   virtual const char* getResetReasonString(uint32_t reason) { return "Not available"; }
   virtual uint8_t getShutdownReason() const { return 0; }
   virtual const char* getShutdownReasonString(uint8_t reason) { return "Not available"; }
+
+  // Brownout detection interface (nRF52 overrides with real hardware comparator)
+  virtual bool brownoutDetected() { return false; }
+  virtual bool checkBrownout() { return false; }
+  static const unsigned long BROWNOUT_RECOVERY_INTERVAL_MS = 3600000UL;  // ~1 hour
 };
 
 /**

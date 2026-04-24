@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <nrf.h>
 #include <MeshCore.h>
 
 #if defined(NRF52_PLATFORM)
@@ -48,6 +49,18 @@ public:
   NRF52Board(char *otaname) : ota_name(otaname) {}
   virtual void begin();
   virtual uint8_t getStartupReason() const override { return startup_reason; }
+
+  // Brownout detection — uses nRF52 POWER->POFCON hardware comparator.
+  // Call checkBrownout() every loop iteration to poll the hardware event.
+  // Recovery is checked via ADC (getBattMilliVolts) roughly once per hour.
+  void initBrownoutDetect(uint8_t threshold_vdd = 11);  // 11 = 2.4V
+  bool checkBrownout() override;
+  bool brownoutDetected() override { return _brownout_detected; }
+  volatile bool _brownout_detected = false;
+  uint32_t _brownout_count = 0;
+  unsigned long _brownout_recovery_check_at = 0;
+  static const uint16_t BROWNOUT_RECOVERY_MV = 2600;  // hysteresis above 2.4V POF threshold
+
   virtual float getMCUTemperature() override;
   virtual void reboot() override { NVIC_SystemReset(); }
   virtual bool getBootloaderVersion(char* version, size_t max_len) override;

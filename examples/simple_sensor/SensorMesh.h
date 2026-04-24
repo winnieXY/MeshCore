@@ -59,7 +59,15 @@ public:
   const char* getRole() override { return FIRMWARE_ROLE; }
   const char* getNodeName() { return _prefs.node_name; }
   NodePrefs* getNodePrefs() { return &_prefs; }
-  void savePrefs() override { _cli.savePrefs(_fs); }
+  void savePrefs() override {
+    if (board.brownoutDetected()) {
+      _prefs_save_pending = true;
+      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
+    } else {
+      _cli.savePrefs(_fs);
+      _prefs_save_pending = false;
+    }
+  }
   bool formatFileSystem() override;
   void sendSelfAdvertisement(int delay_millis, bool flood) override;
   void updateAdvertTimer() override;
@@ -138,6 +146,7 @@ private:
   CommonCLI _cli;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   unsigned long dirty_contacts_expiry;
+  bool _prefs_save_pending = false;
   CayenneLPP telemetry;
   TransportKeyStore key_store;
   RegionMap region_map;

@@ -106,6 +106,7 @@ void setup() {
 }
 
 void loop() {
+  board.checkBrownout();
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
     char c = Serial.read();

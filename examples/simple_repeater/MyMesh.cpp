@@ -1122,6 +1122,12 @@ void MyMesh::startRegionsLoad() {
 }
 
 bool MyMesh::saveRegions() {
+  if (board.brownoutDetected()) {
+    _regions_save_pending = true;
+    MESH_DEBUG_PRINTLN("saveRegions: deferred (brownout)");
+    return false;
+  }
+  _regions_save_pending = false;
   return region_map.save(_fs);
 }
 
@@ -1291,8 +1297,25 @@ void MyMesh::loop() {
 
   // is pending dirty contacts write needed?
   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+    if (board.brownoutDetected()) {
+      // Reschedule to match the ~1h ADC recovery check interval
+      dirty_contacts_expiry = futureMillis(board.BROWNOUT_RECOVERY_INTERVAL_MS);
+      return;
+    }
     acl.save(_fs);
     dirty_contacts_expiry = 0;
+  }
+
+  // Flush any brownout-deferred saves now that voltage has recovered
+  if (_prefs_save_pending && !board.brownoutDetected()) {
+    _cli.savePrefs(_fs);
+    _prefs_save_pending = false;
+    MESH_DEBUG_PRINTLN("savePrefs: flushed after brownout recovery");
+  }
+  if (_regions_save_pending && !board.brownoutDetected()) {
+    region_map.save(_fs);
+    _regions_save_pending = false;
+    MESH_DEBUG_PRINTLN("saveRegions: flushed after brownout recovery");
   }
 
   // update uptime

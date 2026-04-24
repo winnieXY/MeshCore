@@ -103,6 +103,8 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   unsigned long pending_discover_until;
   bool region_load_active;
   unsigned long dirty_contacts_expiry;
+  bool _prefs_save_pending = false;
+  bool _regions_save_pending = false;
 #if MAX_NEIGHBOURS
   NeighbourInfo neighbours[MAX_NEIGHBOURS];
 #endif
@@ -189,7 +191,13 @@ public:
   }
 
   void savePrefs() override {
-    _cli.savePrefs(_fs);
+    if (board.brownoutDetected()) {
+      _prefs_save_pending = true;
+      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
+    } else {
+      _cli.savePrefs(_fs);
+      _prefs_save_pending = false;
+    }
   }
 
   void sendFloodScoped(const TransportKey& scope, mesh::Packet* pkt, uint32_t delay_millis, uint8_t path_hash_size);

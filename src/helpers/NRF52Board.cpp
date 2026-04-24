@@ -20,6 +20,70 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
 
 void NRF52Board::begin() {
   startup_reason = BD_STARTUP_NORMAL;
+
+  initBrownoutDetect();
+}
+
+void NRF52Board::initBrownoutDetect(uint8_t threshold_vdd) {
+  // POFCON is NOT managed by the SoftDevice — direct register access is safe.
+  //
+  // POFCON register layout (nRF52840 Product Specification 6.1.2):
+  //   Bit 0:     POF enable (1 = enabled)
+  //   Bits 4..1: THRESHOLD (4=V17..8=V21, 9=V22, 10=V23, 11=V24, ..15=V28)
+  //
+  // Default 11 = 2.4V: well above the 1.7V minimum for flash writes.
+
+  NRF_POWER->POFCON = (1 << 0) |                       // Enable POF
+                       ((uint32_t)threshold_vdd << 1);  // VDD threshold
+
+  // EVENTS_POFWARN is a separate event register — writing 0 clears the
+  // pending event flag. The comparator itself stays enabled via POFCON.
+  NRF_POWER->EVENTS_POFWARN = 0;
+
+  _brownout_detected = false;
+  _brownout_count = 0;
+
+  MESH_DEBUG_PRINTLN("BROWNOUT: POF enabled, VDD threshold index=%u", threshold_vdd);
+}
+
+bool NRF52Board::checkBrownout() {
+  if (NRF_POWER->EVENTS_POFWARN) {
+    // The POF event is edge-triggered: it fires once when VDD crosses
+    // below threshold. If we clear it while VDD is still low, it will
+    // NOT re-fire. So we leave the event latched here.
+    //
+    // Recovery is detected via periodic ADC check (see below).
+    if (!_brownout_detected) {
+      _brownout_count++;
+      _brownout_recovery_check_at = millis() + BROWNOUT_RECOVERY_INTERVAL_MS;
+      MESH_DEBUG_PRINTLN("BROWNOUT: VDD below threshold! (#%lu), next recovery check in ~1h",
+                         (unsigned long)_brownout_count);
+    }
+    _brownout_detected = true;
+    return true;
+  }
+
+  // No POF event — check if we are in a latched brownout awaiting recovery
+  if (_brownout_detected) {
+    // Only check ADC roughly once per hour to avoid overhead
+    if (millis() >= _brownout_recovery_check_at) {
+      uint16_t mv = getBattMilliVolts();
+      if (mv >= BROWNOUT_RECOVERY_MV) {
+        // Voltage has recovered with sufficient margin — clear the latch
+        NRF_POWER->EVENTS_POFWARN = 0;
+        (void)NRF_POWER->EVENTS_POFWARN;  // read-back fence per Nordic errata
+        _brownout_detected = false;
+        MESH_DEBUG_PRINTLN("BROWNOUT: VDD recovered (%u mV), flash writes re-enabled", mv);
+        return false;
+      }
+      // Still low — schedule next check
+      _brownout_recovery_check_at = millis() + BROWNOUT_RECOVERY_INTERVAL_MS;
+      MESH_DEBUG_PRINTLN("BROWNOUT: VDD still low (%u mV), next check in ~1h", mv);
+    }
+    return true;  // still in brownout
+  }
+
+  return false;  // never triggered
 }
 
 #ifdef NRF52_POWER_MANAGEMENT
