@@ -1,33 +1,65 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: MeshCore Security Audit <audit@meshcore.local>
-Date: Tue, 22 Apr 2026 00:00:00 +0000
-Subject: [PATCH 2/3] bug22: Add brownout detection (POFCON) for nRF52 platforms
+Date: Thu, 24 Apr 2026 00:00:00 +0000
+Subject: [PATCH 2/4] bug22: Add brownout detection with deferred flash writes
 
 The nRF52840 POWER peripheral has a power-failure comparator (POF) that
-can warn when VDD drops below a configurable threshold. On solar-powered
-devices like the SenseCAP Solar P1, battery voltage can sag during LoRa
-TX bursts (up to 130mA). If voltage drops below the nRF52840 minimum
-operating voltage during an NVMC flash erase (~85ms CPU stall), the
-result is undefined — potentially a HardFault or flash corruption.
+generates an event when VDD drops below a configurable threshold.
 
-This patch adds brownout detection using the POF hardware:
-- Enables the POFCON comparator at 2.4V threshold (nRF52840 min Vdd for
-  flash write is 1.7V, but 2.4V gives margin for the voltage regulator)
-- Polls for NRF_EVT_POWER_FAILURE_WARNING events in each loop()
-- Sets a volatile flag that flash-writing code can check
-- Logs a warning when brownout is detected
+This patch:
+1. Enables the POF comparator at 2.4V threshold in NRF52Board::begin()
+2. Polls EVENTS_POFWARN each loop() iteration via board.checkBrownout()
+3. Adds MainBoard::brownoutDetected() virtual (default: false)
+4. Overrides brownoutDetected() in NRF52Board using the hardware flag
+5. Guards savePrefs() — if brownoutDetected(), sets a pending flag
+   instead of writing. The pending save is flushed in loop() once
+   voltage recovers.
+6. Guards saveRegions() the same way via a separate pending flag
+7. Guards acl.save() — defers dirty_contacts_expiry by 200ms
 
-The POF comparator uses direct register access (no SoftDevice dependency)
-so it works regardless of whether SD is enabled.
+The prefs are already updated in RAM by the set command. Only the flash
+write is deferred. Once voltage recovers, loop() detects the pending
+flag and flushes to flash automatically — no data is lost.
 
-Note: This patch does NOT block flash writes during brownout. It only
-provides detection and logging. Blocking writes requires changes to the
-Adafruit LittleFS HAL which is outside the MeshCore tree.
+The POF comparator uses direct register access (no SoftDevice dependency).
+2.4V threshold is well above the 1.7V flash minimum, giving margin for
+the voltage regulator and transient sag during LoRa TX.
+
+The POF event is edge-triggered (fires on VDD falling below threshold).
+Recovery is detected by polling getBattMilliVolts() via ADC roughly once
+per hour (not every loop), requiring VDD > 2.6V (200mV hysteresis).
+When recovery is confirmed, the POF event is cleared and pending saves
+are flushed automatically.
 ---
- src/helpers/NRF52Board.cpp |  43 +++++++++++++++++++++++++++++++++++++
- src/helpers/NRF52Board.h   |  14 +++++++++++++
- 2 files changed, 57 insertions(+)
+ examples/simple_repeater/main.cpp      |  3 +++
+ examples/simple_repeater/MyMesh.cpp    | 22 +++++++++++++++++++
+ examples/simple_repeater/MyMesh.h      | 13 ++++++++++--
+ examples/simple_room_server/main.cpp   |  3 +++
+ examples/simple_room_server/MyMesh.cpp | 16 ++++++++++++++
+ examples/simple_room_server/MyMesh.h   | 12 +++++++++--
+ examples/simple_sensor/main.cpp        |  3 +++
+ examples/simple_sensor/SensorMesh.cpp  | 16 ++++++++++++++
+ examples/simple_sensor/SensorMesh.h    | 12 +++++++++--
+ src/MeshCore.h                         |  3 +++
+ src/helpers/NRF52Board.cpp             | 36 ++++++++++++++++++++++++++++++
+ src/helpers/NRF52Board.h               | 10 +++++++++
+ 12 files changed, 143 insertions(+), 6 deletions(-)
 
+diff --git a/src/MeshCore.h b/src/MeshCore.h
+index 0000001..0000002 100644
+--- a/src/MeshCore.h
++++ b/src/MeshCore.h
+@@ -68,6 +68,9 @@ public:
+   virtual uint8_t getShutdownReason() const { return 0; }
+   virtual const char* getShutdownReasonString(uint8_t reason) { return "Not available"; }
++
++  // Returns true if VDD has dropped below the power-failure threshold
++  virtual bool brownoutDetected() { return false; }
++  virtual bool checkBrownout() { return false; }
++  static const unsigned long BROWNOUT_RECOVERY_INTERVAL_MS = 3600000UL;  // ~1 hour
+ };
+ 
+ /**
 diff --git a/src/helpers/NRF52Board.h b/src/helpers/NRF52Board.h
 index 0000001..0000002 100644
 --- a/src/helpers/NRF52Board.h
@@ -40,22 +72,21 @@ index 0000001..0000002 100644
  #include <MeshCore.h>
  
  #if defined(NRF52_PLATFORM)
-@@ -47,6 +48,19 @@
+@@ -47,6 +48,15 @@
    NRF52Board(char *otaname) : ota_name(otaname) {}
    virtual void begin();
    virtual uint8_t getStartupReason() const override { return startup_reason; }
 +
 +  // Brownout detection — uses nRF52 POWER->POFCON hardware comparator.
-+  // Call initBrownoutDetect() once in begin(), poll checkBrownout() in loop().
-+  // When VDD drops below threshold, brownout_detected is set true.
-+  void initBrownoutDetect(uint8_t threshold_vdd = 10,     // NRF_POWER_THRESHOLD_V24 = 2.4V
-+                           uint8_t threshold_vddh = 0);   // 0 = don't set VDDH threshold
++  // Call checkBrownout() every loop iteration to poll the hardware event.
++  // Recovery is checked via ADC (getBattMilliVolts) roughly once per hour.
++  void initBrownoutDetect(uint8_t threshold_vdd = 11);  // 11 = 2.4V
 +  bool checkBrownout();
-+  volatile bool brownout_detected = false;
-+  uint32_t brownout_count = 0;
-+
-+  // Can be checked by flash-writing code to defer writes
-+  bool isBrownout() const { return brownout_detected; }
++  bool brownoutDetected() override { return _brownout_detected; }
++  volatile bool _brownout_detected = false;
++  uint32_t _brownout_count = 0;
++  unsigned long _brownout_recovery_check_at = 0;
++  static const uint16_t BROWNOUT_RECOVERY_MV = 2600;  // hysteresis above 2.4V POF threshold
 +
    virtual float getMCUTemperature() override;
    virtual void reboot() override { NVIC_SystemReset(); }
@@ -64,60 +95,271 @@ diff --git a/src/helpers/NRF52Board.cpp b/src/helpers/NRF52Board.cpp
 index 0000001..0000002 100644
 --- a/src/helpers/NRF52Board.cpp
 +++ b/src/helpers/NRF52Board.cpp
-@@ -21,6 +21,49 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+@@ -22,6 +22,42 @@ static void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+ 
  void NRF52Board::begin() {
    startup_reason = BD_STARTUP_NORMAL;
 +
-+  // Enable brownout detection with 2.4V threshold
 +  initBrownoutDetect();
 +}
 +
-+void NRF52Board::initBrownoutDetect(uint8_t threshold_vdd, uint8_t threshold_vddh) {
-+  // The POFCON register is NOT managed by the SoftDevice —
-+  // direct register access is safe in all configurations.
++void NRF52Board::initBrownoutDetect(uint8_t threshold_vdd) {
++  // POFCON is NOT managed by the SoftDevice — direct register access is safe.
 +  //
 +  // POFCON register layout (nRF52840 Product Specification 6.1.2):
-+  //   Bit 0:    POF enable (1 = enabled)
-+  //   Bits 4-1: THRESHOLD (4=1.7V, 5=1.8V, ... 14=2.8V)
++  //   Bit 0:     POF enable (1 = enabled)
++  //   Bits 4..1: THRESHOLD (4=V17..8=V21, 9=V22, 10=V23, 11=V24, ..15=V28)
 +  //
-+  // We use 2.4V (value 10) as default: well above the 1.7V minimum for
-+  // flash writes, gives the voltage regulator headroom during LoRa TX bursts.
++  // Default 11 = 2.4V: well above the 1.7V minimum for flash writes.
 +
-+  NRF_POWER->POFCON = (1 << 0) |                           // Enable POF
-+                       ((uint32_t)threshold_vdd << 1);      // VDD threshold
++  NRF_POWER->POFCON = (1 << 0) |                       // Enable POF
++                       ((uint32_t)threshold_vdd << 1);  // VDD threshold
 +
-+  // Clear any stale POF event
++  // EVENTS_POFWARN is a separate event register — writing 0 clears the
++  // pending event flag. The comparator itself stays enabled via POFCON.
 +  NRF_POWER->EVENTS_POFWARN = 0;
 +
-+  // Enable interrupt for POF warning (fires NRF_EVT_POWER_FAILURE_WARNING
-+  // if SoftDevice is enabled, or direct POWER_IRQ if not)
-+  NRF_POWER->INTENSET = POWER_INTENSET_POFWARN_Msk;
-+
-+  brownout_detected = false;
-+  brownout_count = 0;
++  _brownout_detected = false;
++  _brownout_count = 0;
 +
 +  MESH_DEBUG_PRINTLN("BROWNOUT: POF enabled, VDD threshold index=%u", threshold_vdd);
 +}
 +
 +bool NRF52Board::checkBrownout() {
-+  // Poll the hardware event register directly.
-+  // This works whether SoftDevice is enabled or not.
 +  if (NRF_POWER->EVENTS_POFWARN) {
-+    NRF_POWER->EVENTS_POFWARN = 0;  // Clear for next detection
-+
-+    brownout_detected = true;
-+    brownout_count++;
-+
-+    MESH_DEBUG_PRINTLN("BROWNOUT: Power failure warning #%lu! VDD below threshold",
-+                       (unsigned long)brownout_count);
++    // The POF event is edge-triggered: it fires once when VDD crosses
++    // below threshold. If we clear it while VDD is still low, it will
++    // NOT re-fire. So we leave the event latched here.
++    //
++    // Recovery is detected via periodic ADC check (see below).
++    if (!_brownout_detected) {
++      _brownout_count++;
++      _brownout_recovery_check_at = millis() + BROWNOUT_RECOVERY_INTERVAL_MS;
++      MESH_DEBUG_PRINTLN("BROWNOUT: VDD below threshold! (#%lu), next recovery check in ~1h",
++                         (unsigned long)_brownout_count);
++    }
++    _brownout_detected = true;
 +    return true;
 +  }
 +
-+  // Clear flag after voltage recovers (simple hysteresis)
-+  brownout_detected = false;
-+  return false;
++  // No POF event — check if we are in a latched brownout awaiting recovery
++  if (_brownout_detected) {
++    // Only check ADC roughly once per hour to avoid overhead
++    if (millis() >= _brownout_recovery_check_at) {
++      uint16_t mv = getBattMilliVolts();
++      if (mv >= BROWNOUT_RECOVERY_MV) {
++        // Voltage has recovered with sufficient margin — clear the latch
++        NRF_POWER->EVENTS_POFWARN = 0;
++        (void)NRF_POWER->EVENTS_POFWARN;  // read-back fence per Nordic errata
++        _brownout_detected = false;
++        MESH_DEBUG_PRINTLN("BROWNOUT: VDD recovered (%u mV), flash writes re-enabled", mv);
++        return false;
++      }
++      // Still low — schedule next check
++      _brownout_recovery_check_at = millis() + BROWNOUT_RECOVERY_INTERVAL_MS;
++      MESH_DEBUG_PRINTLN("BROWNOUT: VDD still low (%u mV), next check in ~1h", mv);
++    }
++    return true;  // still in brownout
++  }
++
++  return false;  // never triggered
  }
  
  #ifdef NRF52_POWER_MANAGEMENT
+diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/main.cpp
++++ b/examples/simple_repeater/main.cpp
+@@ -107,6 +107,9 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.checkBrownout();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/examples/simple_repeater/MyMesh.h b/examples/simple_repeater/MyMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/MyMesh.h
++++ b/examples/simple_repeater/MyMesh.h
+@@ -103,6 +103,8 @@ private:
+   unsigned long pending_discover_until;
+   bool region_load_active;
+   unsigned long dirty_contacts_expiry;
++  bool _prefs_save_pending = false;
++  bool _regions_save_pending = false;
+ #if MAX_NEIGHBOURS
+   NeighbourInfo neighbours[MAX_NEIGHBOURS];
+ #endif
+@@ -191,7 +193,14 @@ public:
+ 
+   void savePrefs() override {
+-    _cli.savePrefs(_fs);
++    if (board.brownoutDetected()) {
++      _prefs_save_pending = true;
++      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
++    } else {
++      _cli.savePrefs(_fs);
++      _prefs_save_pending = false;
++    }
+   }
+ 
+ 
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -1124,6 +1124,12 @@ void MyMesh::handleSensorData(uint8_t type, const uint8_t* data, size_t len) {
+ }
+ 
+ bool MyMesh::saveRegions() {
++  if (board.brownoutDetected()) {
++    _regions_save_pending = true;
++    MESH_DEBUG_PRINTLN("saveRegions: deferred (brownout)");
++    return false;
++  }
++  _regions_save_pending = false;
+   return region_map.save(_fs);
+ }
+ 
+@@ -1293,6 +1299,22 @@ void MyMesh::loop() {
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
++    if (board.brownoutDetected()) {
++      // Reschedule to match the ~1h ADC recovery check interval
++      dirty_contacts_expiry = futureMillis(board.BROWNOUT_RECOVERY_INTERVAL_MS);
++      return;
++    }
+     acl.save(_fs);
+     dirty_contacts_expiry = 0;
+   }
++
++  // Flush any brownout-deferred saves now that voltage has recovered
++  if (_prefs_save_pending && !board.brownoutDetected()) {
++    _cli.savePrefs(_fs);
++    _prefs_save_pending = false;
++    MESH_DEBUG_PRINTLN("savePrefs: flushed after brownout recovery");
++  }
++  if (_regions_save_pending && !board.brownoutDetected()) {
++    region_map.save(_fs);
++    _regions_save_pending = false;
++    MESH_DEBUG_PRINTLN("saveRegions: flushed after brownout recovery");
++  }
+ 
+   // update uptime
+diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_room_server/main.cpp
++++ b/examples/simple_room_server/main.cpp
+@@ -107,6 +107,9 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.checkBrownout();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/examples/simple_room_server/MyMesh.h b/examples/simple_room_server/MyMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_room_server/MyMesh.h
++++ b/examples/simple_room_server/MyMesh.h
+@@ -101,6 +101,7 @@ private:
+   ClientACL acl;
+   CommonCLI _cli;
+   unsigned long dirty_contacts_expiry;
++  bool _prefs_save_pending = false;
+   uint8_t reply_data[MAX_PACKET_PAYLOAD];
+ 
+@@ -185,7 +186,14 @@ public:
+ 
+   void savePrefs() override {
+-    _cli.savePrefs(_fs);
++    if (board.brownoutDetected()) {
++      _prefs_save_pending = true;
++      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
++    } else {
++      _cli.savePrefs(_fs);
++      _prefs_save_pending = false;
++    }
+   }
+ 
+diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_room_server/MyMesh.cpp
++++ b/examples/simple_room_server/MyMesh.cpp
+@@ -1011,6 +1011,22 @@ void MyMesh::loop() {
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
++    if (board.brownoutDetected()) {
++      dirty_contacts_expiry = futureMillis(board.BROWNOUT_RECOVERY_INTERVAL_MS);
++      return;
++    }
+     acl.save(_fs, MyMesh::saveFilter);
+     dirty_contacts_expiry = 0;
+   }
++
++  // Flush brownout-deferred prefs save
++  if (_prefs_save_pending && !board.brownoutDetected()) {
++    _cli.savePrefs(_fs);
++    _prefs_save_pending = false;
++    MESH_DEBUG_PRINTLN("savePrefs: flushed after brownout recovery");
++  }
+ 
+diff --git a/examples/simple_sensor/main.cpp b/examples/simple_sensor/main.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_sensor/main.cpp
++++ b/examples/simple_sensor/main.cpp
+@@ -107,6 +107,9 @@ void setup() {
+ }
+ 
+ void loop() {
++  board.checkBrownout();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/examples/simple_sensor/SensorMesh.h b/examples/simple_sensor/SensorMesh.h
+index 0000001..0000002 100644
+--- a/examples/simple_sensor/SensorMesh.h
++++ b/examples/simple_sensor/SensorMesh.h
+@@ -40,6 +40,7 @@ private:
+   ClientACL acl;
+   CommonCLI _cli;
+   unsigned long dirty_contacts_expiry;
++  bool _prefs_save_pending = false;
+ 
+@@ -62,7 +63,14 @@ public:
+-  void savePrefs() override { _cli.savePrefs(_fs); }
++  void savePrefs() override {
++    if (board.brownoutDetected()) {
++      _prefs_save_pending = true;
++      MESH_DEBUG_PRINTLN("savePrefs: deferred (brownout)");
++    } else {
++      _cli.savePrefs(_fs);
++      _prefs_save_pending = false;
++    }
++  }
+   bool formatFileSystem() override;
+diff --git a/examples/simple_sensor/SensorMesh.cpp b/examples/simple_sensor/SensorMesh.cpp
+index 0000001..0000002 100644
+--- a/examples/simple_sensor/SensorMesh.cpp
++++ b/examples/simple_sensor/SensorMesh.cpp
+@@ -968,6 +968,22 @@ void SensorMesh::loop() {
+   // is there are pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
++    if (board.brownoutDetected()) {
++      dirty_contacts_expiry = futureMillis(board.BROWNOUT_RECOVERY_INTERVAL_MS);
++      return;
++    }
+     acl.save(_fs);
+     dirty_contacts_expiry = 0;
+   }
++
++  // Flush brownout-deferred prefs save
++  if (_prefs_save_pending && !board.brownoutDetected()) {
++    _cli.savePrefs(_fs);
++    _prefs_save_pending = false;
++    MESH_DEBUG_PRINTLN("savePrefs: flushed after brownout recovery");
++  }
+ }
 -- 
 2.40.0
