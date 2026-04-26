@@ -1,6 +1,6 @@
 #include "RegionMap.h"
 #include <helpers/TxtDataHelpers.h>
-#include <SHA256.h>
+#include <SHA256.h> 
 
 // helper class for region map exporter, we emulate Stream with a safe buffer writer.
 
@@ -58,8 +58,15 @@ static const char* skip_hash(const char* name) {
   return *name == '#' ? name + 1 : name;
 }
 
-static File openWriteTemp(FILESYSTEM* _fs, const char* filename, const char* tmp_filename) {
+static char* getTmpPath(const char* filename) {
+  static char tmp_filename[32];
+  snprintf(tmp_filename, sizeof(tmp_filename), "%s.tmp", filename);
+  return tmp_filename;
+}
+
+static File openWrite(FILESYSTEM* _fs, const char* filename) {
   #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    char* tmp_filename = getTmpPath(filename);
     _fs->remove(tmp_filename);
     return _fs->open(tmp_filename, FILE_O_WRITE);
   #elif defined(RP2040_PLATFORM)
@@ -116,9 +123,7 @@ bool RegionMap::load(FILESYSTEM* _fs, const char* path) {
 
 bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
   const char* real_path = path ? path : "/regions2";
-  char tmp_path[32];
-  snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", real_path);
-  File file = openWriteTemp(_fs, real_path, tmp_path);
+  File file = openWrite(_fs, real_path);
   if (file) {
     uint8_t pad[128];
     memset(pad, 0, sizeof(pad));
@@ -144,6 +149,7 @@ bool RegionMap::save(FILESYSTEM* _fs, const char* path) {
     file.close();
 
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
+    char* tmp_path = getTmpPath(real_path);
     if (!_fs->rename(tmp_path, real_path)) {
       _fs->remove(tmp_path);
       MESH_DEBUG_PRINTLN("ERROR: RegionMap::save rename failed!");
